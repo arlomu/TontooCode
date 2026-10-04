@@ -111,6 +111,7 @@ class Splash:
         self.height = height
         self._timers: list[str] = []
         self._assets: list[PhotoImage] = []
+        self._canvas: Canvas | None = None
         self._status_item: int | None = None
         self._closed = False
 
@@ -143,11 +144,11 @@ class Splash:
         self._draw_wordmark(canvas)
         self._status_item = canvas.create_text(
             MARGIN,
-            self.height - MARGIN - 9,
+            self.height - MARGIN - 10,
             text="",
             font=tkfont.Font(family=MONO_FONT, size=-STATUS_PX),
             fill=STATUS_INK,
-            anchor="ls",
+            anchor="sw",
         )
 
     def _draw_wordmark(self, canvas: Canvas) -> None:
@@ -166,18 +167,18 @@ class Splash:
             canvas.create_image(MARGIN, icon_y, image=icon, anchor="nw")
 
         text_x = MARGIN + (ICON_SIZE if icon is not None else 0) + WORDMARK_GAP
-        baseline = icon_center_y + 9
 
         wordmark_font = tkfont.Font(family=DISPLAY_FONT, size=-WORDMARK_PX, weight="bold")
+        line_bottom = icon_center_y + wordmark_font.metrics("linespace") / 2
         canvas.create_text(
-            text_x, baseline, text="Tontoo", font=wordmark_font, fill=INK, anchor="ls"
+            text_x, line_bottom, text="Tontoo", font=wordmark_font, fill=INK, anchor="sw"
         )
 
         code_font = tkfont.Font(family=MONO_FONT, size=-CODE_PX, weight="bold")
         x = text_x + wordmark_font.measure("Tontoo") + WORDMARK_GAP
         tracking = round(CODE_PX * CODE_TRACKING_EM)
         for char in "CODE":
-            canvas.create_text(x, baseline, text=char, font=code_font, fill=SIGNAL, anchor="ls")
+            canvas.create_text(x, line_bottom, text=char, font=code_font, fill=SIGNAL, anchor="sw")
             x += code_font.measure(char) + tracking
 
     def play(self) -> None:
