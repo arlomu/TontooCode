@@ -92,7 +92,7 @@ export function Conversation({ messages, status, projects, draftProject, onDraft
               .join('\n');
             return (
               <div key={m.id} className="tt-rise flex justify-end">
-                <div className="max-w-[80%] rounded-xl rounded-br-sm border border-tt-hairline bg-tt-card px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap">
+                <div className="max-w-[80%] rounded-xl bg-black px-4 py-2.5 text-[14px] leading-relaxed text-white whitespace-pre-wrap">
                   {text}
                 </div>
               </div>
