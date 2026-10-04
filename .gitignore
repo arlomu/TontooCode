@@ -27,6 +27,8 @@ electron-builder.yml
 venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+*.egg
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

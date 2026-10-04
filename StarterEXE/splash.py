@@ -56,7 +56,7 @@ def _blend(start: tuple[int, int, int], end: tuple[int, int, int], t: float) -> 
     )
 
 
-_GRADIENT_STEPS = 1024
+_GRADIENT_STEPS = 256
 _GRADIENT_COLORS = [
     "#%02x%02x%02x" % _blend(GRADIENT_TOP, GRADIENT_BOTTOM, i / (_GRADIENT_STEPS - 1))
     for i in range(_GRADIENT_STEPS)
