@@ -152,7 +152,7 @@ class InstallerApp:
         Label(
             body,
             text=(
-                "This builds three executables and installs them into\n"
+                "This unpacks the application into\n"
                 f"{installer.INSTALL_DIR}\n\n"
                 "A Start menu entry named TontooCode is added so you can\n"
                 "launch the app by searching for it."
@@ -337,7 +337,6 @@ class InstallerApp:
             if self._summary is not None:
                 self._summary.configure(text="Installation complete", foreground=OK)
             self._append_log("")
-            self._append_log(f"Installed to {installer.INSTALL_DIR}")
             self._append_log("Search for TontooCode in the Start menu to launch it.")
         else:
             if self._summary is not None:

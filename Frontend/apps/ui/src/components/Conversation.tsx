@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { User } from 'lucide-react';
 import type { ChatStatus } from 'ai';
 import type { TontooMessage } from '@/types';
 import { Plus } from 'lucide-react';
@@ -18,14 +17,6 @@ interface ConversationProps {
   onAddProject: (project: NewProject) => void;
 }
 
-function runLabel(index: number): string {
-  const t = new Date();
-  const hh = String(t.getHours()).padStart(2, '0');
-  const mm = String(t.getMinutes()).padStart(2, '0');
-  const ss = String(t.getSeconds()).padStart(2, '0');
-  return `run ${hh}:${mm}:${ss} · turn ${index + 1} · mock`;
-}
-
 export function Conversation({ messages, status, projects, draftProject, onDraftProjectChange, onAddProject }: ConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -41,9 +32,7 @@ export function Conversation({ messages, status, projects, draftProject, onDraft
     const el = scrollRef.current;
     if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, status]);
-
   const liveId = status === 'streaming' || status === 'submitted' ? messages.at(-1)?.id : null;
-  let turn = 0;
 
   if (messages.length === 0) {
     return (
@@ -102,19 +91,15 @@ export function Conversation({ messages, status, projects, draftProject, onDraft
               .map((p) => p.text)
               .join('\n');
             return (
-              <div key={m.id} className="tt-rise flex justify-end gap-3">
+              <div key={m.id} className="tt-rise flex justify-end">
                 <div className="max-w-[80%] rounded-xl rounded-br-sm border border-tt-hairline bg-tt-card px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap">
                   {text}
-                </div>
-                <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-tt-signal">
-                  <User size={15} className="text-tt-signal-ink" strokeWidth={2.2} />
                 </div>
               </div>
             );
           }
           if (m.role === 'assistant') {
-            const label = runLabel(turn++);
-            return <AssistantTurn key={m.id} message={m} live={m.id === liveId} runLabel={label} />;
+            return <AssistantTurn key={m.id} message={m} live={m.id === liveId} />;
           }
           return null;
         })}
