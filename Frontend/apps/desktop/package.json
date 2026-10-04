@@ -4,11 +4,36 @@
   "version": "0.1.0",
   "description": "Tontoo desktop shell (Electron) — loads the @tontoocode/ui renderer",
   "main": "src/main.js",
-  "scripts": {
+"scripts": {
     "dev": "node scripts/dev.mjs",
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win portable --publish never"
+  },
+  "build": {
+    "appId": "com.tontoo.code",
+    "productName": "Tontoo",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      {
+        "from": "../ui/dist",
+        "to": "ui/dist"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "executableName": "frontend",
+      "artifactName": "frontend.${ext}",
+      "icon": "../../assets/icon.png"
+    }
   },
   "devDependencies": {
-    "electron": "^39.0.0"
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12"
   }
 }
