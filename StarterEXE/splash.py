@@ -1,32 +1,41 @@
-"""Tontoo Code splash screen.
+"""Tontoo Code splash window.
 
 A borderless, taskbar-free window that shows the app wordmark next to the
-bundled icon and plays a short startup sequence, then minimizes itself so the
-real application window can take over.
+bundled icon plus a status line in the bottom-left corner. The window itself
+holds no process logic; see `launcher.py` and `main.py`.
 """
 
 from __future__ import annotations
 
 import atexit
 import shutil
+import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from tkinter import PhotoImage, Tk, font as tkfont
-from tkinter import Canvas
+from tkinter import Canvas, PhotoImage, Tk
+from tkinter import font as tkfont
 
-BASE_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = BASE_DIR / "assets"
+
+def _base_dir() -> Path:
+    """Where bundled assets live — the PyInstaller temp dir when frozen."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parent
+
+
+ASSETS_DIR = _base_dir() / "assets"
 ICON_PATH = ASSETS_DIR / "icon.png"
 
-WINDOW_WIDTH = 540
+WINDOW_WIDTH = 560
 WINDOW_HEIGHT = 360
 MARGIN = 30
 
-ICON_SIZE = 52
-WORDMARK_PX = 24
-CODE_PX = 13
-STATUS_PX = 14
-WORDMARK_GAP = 11
+ICON_SIZE = 84
+WORDMARK_PX = 42
+CODE_PX = 22
+STATUS_PX = 20
+WORDMARK_GAP = 14
 CODE_TRACKING_EM = 0.16
 
 GRADIENT_TOP = (0x24, 0x28, 0x2E)
@@ -73,7 +82,7 @@ def _gradient_row(width: int, height: int, y: int) -> str:
     return "{" + " ".join([_GRADIENT_COLORS[i] for i in indices]) + "}"
 
 
-def _paint_gradient(master, width: int, height: int) -> PhotoImage:
+def _paint_gradient(master: Tk, width: int, height: int) -> PhotoImage:
     """Render the dark-to-light gradient into a PhotoImage, band by band."""
     photo = PhotoImage(master=master, width=width, height=height)
     for y in range(height):
@@ -96,15 +105,15 @@ def _resized_icon(path: Path, size: int) -> Path | None:
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
 
-    workdir = tempfile.mkdtemp(prefix="tontoo-splash-")
+    workdir = Path(tempfile.mkdtemp(prefix="tontoo-splash-"))
     atexit.register(shutil.rmtree, workdir, True)
-    target = Path(workdir) / f"icon-{size}.png"
+    target = workdir / f"icon-{size}.png"
     target.write_bytes(buffer.getvalue())
     return target
 
 
 class Splash:
-    """Borderless splash window that plays the startup sequence."""
+    """Borderless splash window with a wordmark and a status line."""
 
     def __init__(self, width: int = WINDOW_WIDTH, height: int = WINDOW_HEIGHT) -> None:
         self.width = width
@@ -117,7 +126,7 @@ class Splash:
 
         self.root = Tk()
         self.root.withdraw()
-        self.root.title("Tontoo")
+        self.root.title("Tontoo Code")
         self.root.overrideredirect(True)
         self.root.attributes("-toolwindow", True)
         self.root.attributes("-topmost", True)
@@ -133,6 +142,7 @@ class Splash:
             background=HAIRLINE,
         )
         canvas.pack(fill="both", expand=True)
+        self._canvas = canvas
 
         gradient = _paint_gradient(self.root, self.width, self.height)
         self._assets.append(gradient)
@@ -142,9 +152,10 @@ class Splash:
             0.5, 0.5, self.width - 0.5, self.height - 0.5, outline=HAIRLINE
         )
         self._draw_wordmark(canvas)
+
         self._status_item = canvas.create_text(
             MARGIN,
-            self.height - MARGIN - 10,
+            self.height - MARGIN + 5,
             text="",
             font=tkfont.Font(family=MONO_FONT, size=-STATUS_PX),
             fill=STATUS_INK,
@@ -152,19 +163,17 @@ class Splash:
         )
 
     def _draw_wordmark(self, canvas: Canvas) -> None:
-        icon_y = MARGIN
-        icon_center_y = icon_y + ICON_SIZE / 2
+        icon_center_y = MARGIN + ICON_SIZE / 2
 
         icon_path = _resized_icon(ICON_PATH, ICON_SIZE) if ICON_PATH.is_file() else None
+        icon = None
         if icon_path is not None:
             icon = PhotoImage(master=self.root, file=str(icon_path))
         elif ICON_PATH.is_file():
             icon = PhotoImage(master=self.root, file=str(ICON_PATH))
-        else:
-            icon = None
         if icon is not None:
             self._assets.append(icon)
-            canvas.create_image(MARGIN, icon_y, image=icon, anchor="nw")
+            canvas.create_image(MARGIN, MARGIN, image=icon, anchor="nw")
 
         text_x = MARGIN + (ICON_SIZE if icon is not None else 0) + WORDMARK_GAP
 
@@ -181,50 +190,44 @@ class Splash:
             canvas.create_text(x, line_bottom, text=char, font=code_font, fill=SIGNAL, anchor="sw")
             x += code_font.measure(char) + tracking
 
-    def play(self) -> None:
-        """Show the window and run the startup sequence."""
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-        x = (screen_w - self.width) // 2
-        y = (screen_h - self.height) // 2
+    def show(self) -> None:
+        """Center the window on the primary screen and map it without decorations."""
+        x = (self.root.winfo_screenwidth() - self.width) // 2
+        y = (self.root.winfo_screenheight() - self.height) // 2
         self.root.geometry(f"{self.width}x{self.height}+{x}+{y}")
         self.root.deiconify()
         self.root.update_idletasks()
         self.root.lift()
 
+    def play_sequence(self, on_done: Callable[[], None] | None = None) -> None:
+        """Walk the startup status texts. The last one stays until told otherwise."""
+        self.set_status(STARTUP_SEQUENCE[0][0])
         delay = 0
         for text, duration in STARTUP_SEQUENCE:
-            self._timers.append(self.root.after(delay, self._set_status, text))
             delay += duration
-        self._timers.append(self.root.after(delay, self.minimize))
+            self.after(delay, self.set_status, text)
+        if on_done is not None:
+            self.after(delay, on_done)
 
-    def _set_status(self, text: str) -> None:
-        if self._status_item is not None:
-            self.root.itemconfigure(self._status_item, text=text)
+    def set_status(self, text: str) -> None:
+        if self._canvas is not None and self._status_item is not None:
+            self._canvas.itemconfigure(self._status_item, text=text)
 
-    def minimize(self) -> None:
-        """Minimize out of the way; tool windows have no taskbar button to click."""
+    def hide(self) -> None:
+        """Withdraw the splash without tearing down the root, so a Toplevel
+        error window can take over."""
         self._clear_timers()
-        if self._closed:
-            return
-        try:
-            self.root.iconify()
-        except Exception:
-            self.root.withdraw()
-        else:
-            # Override-redirect windows cannot always represent a minimized state.
-            self.root.after(200, self._hide_if_still_visible)
-
-    def _hide_if_still_visible(self) -> None:
-        if not self._closed and self.root.winfo_viewable():
+        if not self._closed:
             self.root.withdraw()
 
-    def restore(self) -> None:
-        if self._closed:
-            return
-        self.root.deiconify()
-        self.root.lift()
-        self.root.attributes("-topmost", True)
+    def after(self, delay_ms: int, func: Callable[..., None], *args: object) -> str:
+        timer = self.root.after(delay_ms, func, *args)
+        self._timers.append(timer)
+        return timer
+
+    def close(self) -> None:
+        """Tear the window down; spawned processes are detached and keep running."""
+        self.destroy()
 
     def destroy(self) -> None:
         if self._closed:
@@ -244,16 +247,9 @@ class Splash:
                 pass
         self._timers.clear()
 
-    def run(self) -> None:
-        self.build()
-        self.play()
+    def mainloop(self) -> None:
         self.root.mainloop()
 
-
-def main() -> None:
-    splash = Splash()
-    splash.run()
-
-
-if __name__ == "__main__":
-    main()
+    @property
+    def closed(self) -> bool:
+        return self._closed
