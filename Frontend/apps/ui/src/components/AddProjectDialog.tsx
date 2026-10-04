@@ -51,7 +51,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
     setSubfolders((prev) => [...prev, ...picked.filter((p) => !prev.includes(p))]);
   };
 
-  const canCreate = name.trim().length > 0;
+  const canCreate = name.trim().length > 0 && mainFolder.trim().length > 0;
 
   return (
     <div
@@ -96,10 +96,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
           {/* main folder */}
           <div>
             <Label>Main folder — 1 folder</Label>
-            <Hint>
-              Single main folder for the project. If empty, a folder will be created under the
-              tasks folder.
-            </Hint>
+            <Hint>Single main folder for the project. Required.</Hint>
             <div className="mt-2 rounded-lg border border-tt-hairline bg-tt-panel/60 p-3">
               <div className="flex items-center gap-2">
                 <Folder size={14} className="shrink-0 text-tt-ink-3" strokeWidth={1.9} />
@@ -115,7 +112,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
               <input
                 value={mainFolder}
                 onChange={(e) => setMainFolder(e.target.value)}
-                placeholder="Auto — will create tasksFolder / Name"
+                placeholder="C:\path\to\project"
                 aria-label="Main folder path"
                 className="font-mono2 mt-2 w-full rounded-md border border-tt-hairline bg-tt-card px-2.5 py-1.5 text-[12px] text-tt-ink outline-none placeholder:text-tt-ink-3 focus:border-tt-signal/50"
               />

@@ -12,7 +12,7 @@ import tontooIcon from '@/assets/tontoo.png';
 interface ConversationProps {
   messages: TontooMessage[];
   status: ChatStatus;
-  projects: { id: string; name: string }[];
+  projects: { id: string; name: string; mainFolder?: string }[];
   draftProject: string;
   onDraftProjectChange: (id: string) => void;
   onAddProject: (project: NewProject) => void;

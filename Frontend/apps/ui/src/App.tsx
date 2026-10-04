@@ -71,7 +71,7 @@ interface WorkspaceProps {
   draftProject: string;
   onDraftProjectChange: (id: string) => void;
   onAddProject: (project: NewProject) => void;
-  projects: { id: string; name: string }[];
+  projects: { id: string; name: string; mainFolder?: string }[];
 }
 
 /**
@@ -240,6 +240,16 @@ export default function App() {
     [customProjects],
   );
 
+  /** Projects enriched with their session-only main folder for the picker. */
+  const projectsWithFolders = useMemo(
+    () =>
+      allProjects.map((p) => ({
+        ...p,
+        mainFolder: projectDetails[p.id]?.mainFolder || undefined,
+      })),
+    [allProjects, projectDetails],
+  );
+
   const addProject = useCallback((p: NewProject) => {
     const id = `custom-${Date.now()}`;
     setCustomProjects((prev) => [...prev, { id, name: p.name }]);
@@ -308,10 +318,10 @@ export default function App() {
   );
 
   const handleNew = useCallback(() => {
-    // New chats land in the project of the last opened chat and reveal it.
+    // New chats land in the project of the last opened chat.
+    // Nothing auto-expands: the sidebar only moves on explicit clicks.
     newChatProject.current = lastProject.current;
     setDraftProject(lastProject.current);
-    setExpanded((prev) => new Set(prev).add(lastProject.current));
     setActiveId(newId());
     setInitial([]);
   }, []);
@@ -435,7 +445,7 @@ return (
               draftProject={draftProject}
               onDraftProjectChange={setDraftProject}
               onAddProject={addProject}
-              projects={allProjects}
+              projects={projectsWithFolders}
             />
           ) : (
             <div className="min-w-0 flex-1">

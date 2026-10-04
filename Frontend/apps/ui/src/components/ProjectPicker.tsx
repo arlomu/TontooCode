@@ -3,7 +3,7 @@ import { Check, ChevronDown, Folder, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProjectPickerProps {
-  projects: { id: string; name: string }[];
+  projects: { id: string; name: string; mainFolder?: string }[];
   value: string;
   onChange: (id: string) => void;
 }
@@ -105,16 +105,23 @@ export function ProjectPicker({ projects, value, onChange }: ProjectPickerProps)
                 >
                   <Folder
                     size={14}
-                    className={cn('shrink-0', selected ? 'text-tt-ink' : 'text-tt-ink-3')}
+                    className={cn('shrink-0 self-start pt-0.5', selected ? 'text-tt-ink' : 'text-tt-ink-3')}
                     strokeWidth={1.8}
                   />
-                  <span
-                    className={cn(
-                      'flex-1 truncate text-[13px]',
-                      selected ? 'font-semibold text-tt-ink' : 'text-tt-ink-2',
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={cn(
+                        'block truncate text-[13px]',
+                        selected ? 'font-semibold text-tt-ink' : 'text-tt-ink-2',
+                      )}
+                    >
+                      {p.name}
+                    </span>
+                    {p.mainFolder && (
+                      <span className="font-mono2 block truncate text-[10.5px] text-tt-ink-3">
+                        {p.mainFolder}
+                      </span>
                     )}
-                  >
-                    {p.name}
                   </span>
                   {selected && (
                     <Check size={14} className="shrink-0 text-tt-ink-2" strokeWidth={2.6} />
