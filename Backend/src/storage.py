@@ -29,6 +29,13 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS providers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    api_key TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -174,3 +181,54 @@ class Storage:
         if existing is not None:
             return existing
         return self.create_project("default", "Default")
+
+    # ----- providers -----
+
+    @staticmethod
+    def _row_to_provider(row: sqlite3.Row, *, with_key: bool = False) -> dict[str, Any]:
+        item: dict[str, Any] = {
+            "id": row["id"],
+            "name": row["name"],
+            "has_key": bool(row["api_key"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+        if with_key:
+            item["api_key"] = row["api_key"]
+        return item
+
+    def list_providers(self) -> list[dict[str, Any]]:
+        """Public listing — API keys are never exposed."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM providers ORDER BY created_at ASC"
+            ).fetchall()
+        return [self._row_to_provider(r) for r in rows]
+
+    def get_provider(self, provider_id: str, *, with_key: bool = False) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM providers WHERE id = ?", (provider_id,)
+            ).fetchone()
+        return self._row_to_provider(row, with_key=with_key) if row else None
+
+    def create_provider(self, provider_id: str, name: str, api_key: str = "") -> dict[str, Any]:
+        now = utcnow()
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO providers (id, name, api_key, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (provider_id, name, api_key, now, now),
+            )
+            self._conn.commit()
+        provider = self.get_provider(provider_id)
+        assert provider is not None
+        return provider
+
+    def delete_provider(self, provider_id: str) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM providers WHERE id = ?", (provider_id,)
+            )
+            self._conn.commit()
+            return cur.rowcount > 0

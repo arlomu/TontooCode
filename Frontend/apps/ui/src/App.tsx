@@ -33,6 +33,7 @@ import {
   DEFAULT_BROWSER_USE,
   type BrowserUse,
 } from '@/components/settings/BrowserUseTab';
+import type { ProvidersState } from '@/components/settings/ProvidersTab';
 import type { NewProject } from '@/components/AddProjectDialog';
 import { TitleBar } from '@/components/TitleBar';
 import { DEFAULT_MODEL } from '@/components/ModelMenu';
@@ -190,6 +191,9 @@ export default function App() {
   const patchBrowserUse = useCallback((patch: Partial<BrowserUse>) => {
     setBrowserUse((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  // Providers — backend-backed list with session fallback while offline.
+  const [providers, setProviders] = useState<ProvidersState>({ providers: [], online: true });
 
   // Apply design + colors live to the document. RAM only.
   useEffect(() => {
@@ -471,6 +475,10 @@ return (
                 browserUse={{
                   value: browserUse,
                   onPatch: patchBrowserUse,
+                }}
+                providers={{
+                  value: providers,
+                  onChange: setProviders,
                 }}
               />
             </div>

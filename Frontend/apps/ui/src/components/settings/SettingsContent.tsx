@@ -4,6 +4,7 @@ import { AppearanceTab, type AppearanceState } from './AppearanceTab';
 import { PersonalizationTab, type Personalization } from './PersonalizationTab';
 import { ComputerUseTab, type ComputerUse } from './ComputerUseTab';
 import { BrowserUseTab, type BrowserUse } from './BrowserUseTab';
+import { ProvidersTab, type ProvidersState } from './ProvidersTab';
 
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: 'General',
@@ -26,6 +27,7 @@ export function SettingsContent({
   personalization,
   computerUse,
   browserUse,
+  providers,
 }: {
   tab: SettingsTab;
   appearance: AppearanceState;
@@ -40,6 +42,10 @@ export function SettingsContent({
   browserUse: {
     value: BrowserUse;
     onPatch: (patch: Partial<BrowserUse>) => void;
+  };
+  providers: {
+    value: ProvidersState;
+    onChange: (state: ProvidersState) => void;
   };
 }) {
   if (tab === 'general') {
@@ -74,6 +80,13 @@ export function SettingsContent({
     return (
       <div className="tt-scroll h-full overflow-y-auto">
         <BrowserUseTab value={browserUse.value} onPatch={browserUse.onPatch} />
+      </div>
+    );
+  }
+  if (tab === 'providers') {
+    return (
+      <div className="tt-scroll h-full overflow-y-auto">
+        <ProvidersTab value={providers.value} onChange={providers.onChange} />
       </div>
     );
   }

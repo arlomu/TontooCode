@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { backend, BackendOfflineError } from '@/lib/backend';
 
 export interface ModelEntry {
   id: string;
@@ -24,15 +25,33 @@ export const MODELS: ModelEntry[] = [
 
 export const DEFAULT_MODEL = MODELS[2]!.id;
 
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Built-in groups win over same-named backend providers (no duplicates). */
+const BUILTIN_GROUP_KEYS = new Set(MODELS.map((m) => norm(m.provider)));
+
+interface ExtraGroup {
+  provider: string;
+  models: ModelEntry[];
+  /** True when the provider has no match in the models.dev catalog. */
+  missing: boolean;
+}
+
 interface ModelMenuProps {
   value: string;
   onChange: (id: string) => void;
 }
 
-/** Model picker: search field, provider groups, check on the active model. */
+/**
+ * Model picker: search field, provider groups, check on the active model.
+ * Backend providers are merged in below the built-ins, with their models
+ * resolved from the models.dev catalog.
+ */
 export function ModelMenu({ value, onChange }: ModelMenuProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [extra, setExtra] = useState<ExtraGroup[] | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,23 +76,85 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
     else setQuery('');
   }, [open]);
 
-  const active = MODELS.find((m) => m.id === value) ?? MODELS[0]!;
+  // Resolve backend provider models once per menu lifetime.
+  useEffect(() => {
+    if (!open || extra !== null || loadingModels) return;
+    let dead = false;
+    setLoadingModels(true);
+    (async () => {
+      try {
+        const providers = await backend.listProviders();
+        const groups = await Promise.all(
+          providers.map(async (p): Promise<ExtraGroup | null> => {
+            if (BUILTIN_GROUP_KEYS.has(norm(p.name))) return null;
+            const load = async () => {
+              try {
+                return await backend.catalogModels(p.id);
+              } catch {
+                return await backend.catalogModels(p.name);
+              }
+            };
+            try {
+              const cat = await load();
+              return {
+                provider: p.name,
+                models: cat.models.map((m) => ({
+                  id: `${cat.id}/${m.id}`,
+                  name: m.name,
+                  provider: p.name,
+                })),
+                missing: false,
+              };
+            } catch {
+              return { provider: p.name, models: [], missing: true };
+            }
+          }),
+        );
+        if (!dead) setExtra(groups.filter((g): g is ExtraGroup => g !== null));
+      } catch (err) {
+        // Offline: built-ins only. Providers tab surfaces the status.
+        if (!dead && !(err instanceof BackendOfflineError)) setExtra([]);
+        else if (!dead) setExtra([]);
+      } finally {
+        if (!dead) setLoadingModels(false);
+      }
+    })();
+    return () => {
+      dead = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open ]);
 
-  const groups = useMemo(() => {
+  const allBuiltin = MODELS;
+  const active =
+    allBuiltin.find((m) => m.id === value) ??
+    (extra ?? []).flatMap((g) => g.models).find((m) => m.id === value) ?? {
+      id: value,
+      name: value,
+      provider: '',
+    };
+
+  const groups = (() => {
     const q = query.trim().toLowerCase();
-    const hits = q
-      ? MODELS.filter(
-          (m) => m.name.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q),
-        )
-      : MODELS;
+    const match = (m: ModelEntry) =>
+      !q || m.name.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q);
     const byProvider = new Map<string, ModelEntry[]>();
-    for (const m of hits) {
+    for (const m of allBuiltin.filter(match)) {
       const list = byProvider.get(m.provider) ?? [];
       list.push(m);
       byProvider.set(m.provider, list);
     }
-    return [...byProvider.entries()];
-  }, [query]);
+    const out: { provider: string; items: ModelEntry[]; missing?: boolean }[] = [
+      ...[...byProvider.entries()].map(([provider, items]) => ({ provider, items })),
+    ];
+    for (const g of extra ?? []) {
+      const items = g.models.filter(match);
+      if (!q || items.length > 0 || g.provider.toLowerCase().includes(q)) {
+        out.push({ provider: g.provider, items, missing: g.missing });
+      }
+    }
+    return out;
+  })();
 
   return (
     <div ref={wrapRef} className="relative">
@@ -96,9 +177,7 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
       </button>
 
       {open && (
-        <div
-          className="tt-rise absolute right-0 bottom-[calc(100%+8px)] z-50 w-[300px] overflow-hidden rounded-xl border border-tt-hairline bg-tt-card shadow-[0_12px_40px_rgb(15_23_42/0.16)]"
-        >
+        <div className="tt-rise absolute right-0 bottom-[calc(100%+8px)] z-50 w-[300px] overflow-hidden rounded-xl border border-tt-hairline bg-tt-card shadow-[0_12px_40px_rgb(15_23_42/0.16)]">
           {/* search */}
           <div className="flex items-center gap-2 border-b border-tt-hairline px-3 py-2.5">
             <Search size={14} className="shrink-0 text-tt-ink-3" strokeWidth={2.1} />
@@ -114,17 +193,27 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
 
           {/* grouped list */}
           <div className="tt-scrollblock max-h-[286px] overflow-y-auto overscroll-contain p-1.5">
-            {groups.length === 0 && (
+            {loadingModels && (
+              <p className="font-mono2 tt-caret px-2.5 py-3 text-[11.5px] text-tt-ink-3">
+                loading provider models
+              </p>
+            )}
+            {!loadingModels && groups.length === 0 && (
               <p className="font-mono2 px-2.5 py-4 text-center text-[11.5px] text-tt-ink-3">
                 no model matches “{query.trim()}”
               </p>
             )}
 
-            {groups.map(([provider, items]) => (
+            {groups.map(({ provider, items, missing }) => (
               <div key={provider} className="pb-1">
                 <h3 className="font-mono2 px-2.5 pt-1.5 pb-1 text-[9.5px] tracking-[0.14em] text-tt-ink-3 uppercase">
                   {provider}
                 </h3>
+                {missing && items.length === 0 && (
+                  <p className="font-mono2 px-2.5 py-1.5 text-[11px] text-tt-ink-3">
+                    no models found in catalog
+                  </p>
+                )}
                 {items.map((m) => {
                   const selected = m.id === value;
                   return (
