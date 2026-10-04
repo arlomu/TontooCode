@@ -25,6 +25,9 @@ export const MODELS: ModelEntry[] = [
 
 export const DEFAULT_MODEL = MODELS[2]!.id;
 
+/** Ids of the hard-coded fallback entries (never shown next to real models). */
+const BUILTIN_IDS: ReadonlySet<string> = new Set(MODELS.map((m) => m.id));
+
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Built-in groups win over same-named backend providers (no duplicates). */
@@ -126,9 +129,23 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
   }, [open ]);
 
   const allBuiltin = MODELS;
+  const realModels = (extra ?? []).flatMap((g) => g.models);
+  // Real catalog models replace the hard-coded fallbacks entirely —
+  // the fallbacks only render while offline or with zero providers.
+  const showBuiltin = realModels.length === 0;
+  const visibleBuiltin = showBuiltin ? allBuiltin : [];
+
+  // Move off a hidden mock id as soon as real models arrive.
+  useEffect(() => {
+    if (realModels.length > 0 && BUILTIN_IDS.has(value)) {
+      onChange(realModels[0]!.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extra, value ]);
+
   const active =
-    allBuiltin.find((m) => m.id === value) ??
-    (extra ?? []).flatMap((g) => g.models).find((m) => m.id === value) ?? {
+    visibleBuiltin.find((m) => m.id === value) ??
+    realModels.find((m) => m.id === value) ?? {
       id: value,
       name: value,
       provider: '',
@@ -139,7 +156,7 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
     const match = (m: ModelEntry) =>
       !q || m.name.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q);
     const byProvider = new Map<string, ModelEntry[]>();
-    for (const m of allBuiltin.filter(match)) {
+    for (const m of visibleBuiltin.filter(match)) {
       const list = byProvider.get(m.provider) ?? [];
       list.push(m);
       byProvider.set(m.provider, list);
