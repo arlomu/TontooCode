@@ -320,7 +320,7 @@ export function AppearanceTab({
             <button
               type="button"
               onClick={onResetTheme}
-              className="rounded-lg border border-tt-hairline bg-white px-3 py-1.5 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
+              className="rounded-lg border border-tt-hairline bg-tt-card px-3 py-1.5 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
             >
               Reset
             </button>
@@ -329,7 +329,7 @@ export function AppearanceTab({
                 value={preset.id}
                 onChange={(e) => onPreset(e.target.value)}
                 aria-label="Theme preset"
-                className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-white py-1.5 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
+                className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-tt-card py-1.5 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
               >
                 {PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>

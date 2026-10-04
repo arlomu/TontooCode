@@ -46,8 +46,8 @@ export function TitleBar({ recent, activeId, onSelect }: TitleBarProps) {
                 className={cn(
                   'my-[5px] min-w-0 flex-1 truncate rounded-md px-3 text-center text-[12px] transition-colors',
                   active
-                    ? 'bg-white font-medium text-tt-ink shadow-[0_1px_2px_rgb(15_23_42/0.08)]'
-                    : 'text-tt-ink-2 hover:bg-white/60 hover:text-tt-ink',
+                    ? 'bg-tt-card font-medium text-tt-ink shadow-[0_1px_2px_rgb(15_23_42/0.08)]'
+                    : 'text-tt-ink-2 hover:bg-tt-card/60 hover:text-tt-ink',
                 )}
               >
                 {c.title}

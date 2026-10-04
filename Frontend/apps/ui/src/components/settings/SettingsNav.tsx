@@ -86,8 +86,8 @@ function Item({
       className={cn(
         'mx-3 flex w-[calc(100%-24px)] items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
         active
-          ? 'bg-white font-medium text-tt-ink shadow-[0_1px_2px_rgb(15_23_42/0.06)]'
-          : 'text-tt-ink-2 hover:bg-white/60',
+          ? 'bg-tt-card font-medium text-tt-ink shadow-[0_1px_2px_rgb(15_23_42/0.06)]'
+          : 'text-tt-ink-2 hover:bg-tt-card/60',
       )}
     >
       <Icon
@@ -119,7 +119,7 @@ export function SettingsNav({ active, onTab, onBack }: SettingsNavProps) {
         <button
           type="button"
           onClick={onBack}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13.5px] text-tt-ink-2 transition-colors hover:bg-white/60 hover:text-tt-ink"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13.5px] text-tt-ink-2 transition-colors hover:bg-tt-card/60 hover:text-tt-ink"
         >
           <ArrowLeft size={15} strokeWidth={2} />
           Back

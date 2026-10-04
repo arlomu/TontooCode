@@ -45,6 +45,23 @@ function newId(): string {
     : `chat-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
+/**
+ * Readable text color on top of an accent background (WCAG relative
+ * luminance). Keeps icons legible on very light custom accents.
+ */
+function onSignalColor(accent: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(accent.trim());
+  if (!m?.[1]) return '#ffffff';
+  const n = parseInt(m[1], 16);
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const luminance =
+    0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return luminance > 0.4 ? '#14181d' : '#ffffff';
+}
+
 interface WorkspaceProps {
   conversationId: string;
   initialMessages: TontooMessage[];
@@ -179,6 +196,12 @@ export default function App() {
     const root = document.documentElement;
     const apply = (dark: boolean) => {
       root.dataset.theme = dark ? 'dark' : 'light';
+      // Keep the native caption-button strip in sync with the theme.
+      void window.tontoo?.setTitleOverlay?.(
+        dark
+          ? { color: '#0f1319', symbolColor: '#a6aebb' }
+          : { color: '#eceef1', symbolColor: '#55606d' },
+      );
     };
     if (design !== 'system') {
       apply(design === 'dark');
@@ -197,6 +220,7 @@ export default function App() {
     const accent = colorOverrides.accent ?? preset.accent;
     style.setProperty('--tt-signal', accent);
     style.setProperty('--tt-signal-soft', `color-mix(in srgb, ${accent} 15%, transparent)`);
+    style.setProperty('--tt-signal-ink', onSignalColor(accent));
     if (colorOverrides.background) style.setProperty('--tt-ground', colorOverrides.background);
     else style.removeProperty('--tt-ground');
     if (colorOverrides.foreground) style.setProperty('--tt-ink', colorOverrides.foreground);

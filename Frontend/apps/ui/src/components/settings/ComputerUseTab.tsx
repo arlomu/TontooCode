@@ -153,7 +153,7 @@ export function ComputerUseTab({ value, onPatch }: ComputerUseProps) {
               value={value.selectionMode}
               onChange={(e) => onPatch({ selectionMode: e.target.value as SelectionMode })}
               aria-label="Selection mode"
-              className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-white py-2 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
+              className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-tt-card py-2 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
             >
               <option value="allow">Allow selected</option>
               <option value="block">Block selected</option>
@@ -257,7 +257,7 @@ function AppList({
 
   return (
     <div className="mt-3">
-      <div className="flex items-center gap-2 rounded-lg border border-tt-hairline bg-white px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg border border-tt-hairline bg-tt-card px-3 py-2">
         <Search size={14} className="shrink-0 text-tt-ink-3" strokeWidth={2.1} />
         <input
           value={query}

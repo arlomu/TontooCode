@@ -210,7 +210,7 @@ export function Composer({ status, model, onModelChange, onSend, onStop }: Compo
                 className={cn(
                   'flex size-8 items-center justify-center rounded-full transition-all',
                   canSend
-                    ? 'bg-tt-ink text-white hover:scale-105'
+                    ? 'bg-tt-ink text-tt-ink-invert hover:scale-105'
                     : 'cursor-not-allowed bg-tt-panel text-tt-ink-3',
                 )}
               >

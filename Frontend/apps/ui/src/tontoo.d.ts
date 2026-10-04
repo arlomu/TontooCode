@@ -9,6 +9,8 @@ export interface TontooBridge {
   pickFolder?: () => Promise<string[]>;
   /** Native multi-folder picker — absolute paths, [] when cancelled. */
   pickFolders?: () => Promise<string[]>;
+  /** Recolor the native caption-button strip (theme sync). */
+  setTitleOverlay?: (colors: { color: string; symbolColor: string }) => Promise<void>;
 }
 
 declare global {

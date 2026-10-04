@@ -96,7 +96,7 @@ export function GeneralTab() {
           <button
             type="button"
             onClick={() => void changeFolder()}
-            className="shrink-0 rounded-md border border-tt-hairline bg-white px-3 py-1 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
+            className="shrink-0 rounded-md border border-tt-hairline bg-tt-card px-3 py-1 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
           >
             Change
           </button>
@@ -122,7 +122,7 @@ export function GeneralTab() {
               value={shells.includes(shell) ? shell : shells[0]!}
               onChange={(e) => setShell(e.target.value)}
               aria-label="Shell"
-              className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-white py-2 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
+              className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-tt-card py-2 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
             >
               {shells.map((s) => (
                 <option key={s} value={s}>

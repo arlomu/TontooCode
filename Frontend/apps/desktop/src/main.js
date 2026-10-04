@@ -97,6 +97,11 @@ app.whenReady().then(() => {
     });
     return res.canceled ? [] : res.filePaths;
   });
+  // Recolor the native caption-button strip when the UI theme changes.
+  ipcMain.handle('tontoo:set-title-overlay', (event, colors) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.setTitleBarOverlay({ ...colors, height: TITLEBAR_HEIGHT });
+  });
 
   createWindow().catch((err) => {
     console.error('[tontoo] failed to open window:', err);

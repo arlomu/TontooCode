@@ -156,7 +156,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onOpenSettings}
-          className="font-mono2 flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left text-[10.5px] tracking-[0.14em] text-tt-ink-3 uppercase transition-colors hover:bg-white/60 hover:text-tt-ink"
+          className="font-mono2 flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left text-[10.5px] tracking-[0.14em] text-tt-ink-3 uppercase transition-colors hover:bg-tt-card/60 hover:text-tt-ink"
         >
           <Settings size={15} className="shrink-0 text-tt-ink-2" strokeWidth={1.8} />
           Settings

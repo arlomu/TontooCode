@@ -151,7 +151,7 @@ export function VoiceRecorder({ onConfirm, onCancel, onError }: VoiceRecorderPro
             aria-label="Use recording"
             title="Use recording"
             className={cn(
-              'flex size-8 items-center justify-center rounded-full bg-tt-ink text-white transition-transform hover:scale-105',
+              'flex size-8 items-center justify-center rounded-full bg-tt-ink text-tt-ink-invert transition-transform hover:scale-105',
             )}
           >
             <Check size={16} strokeWidth={2.6} />

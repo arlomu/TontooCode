@@ -19,4 +19,6 @@ contextBridge.exposeInMainWorld('tontoo', {
   pickFolder: () => ipcRenderer.invoke('tontoo:pick-folder'),
   /** Native multi-folder picker — resolves to absolute paths, [] when cancelled. */
   pickFolders: () => ipcRenderer.invoke('tontoo:pick-folders'),
+  /** Recolor the native caption-button strip (theme sync). */
+  setTitleOverlay: (colors) => ipcRenderer.invoke('tontoo:set-title-overlay', colors),
 });

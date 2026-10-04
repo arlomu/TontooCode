@@ -64,7 +64,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Add project"
-        className="tt-rise max-h-[calc(100%-32px)] w-full max-w-[520px] overflow-y-auto rounded-xl bg-white shadow-[0_24px_80px_rgb(15_23_42/0.25)]"
+        className="tt-rise max-h-[calc(100%-32px)] w-full max-w-[520px] overflow-y-auto rounded-xl bg-tt-card shadow-[0_24px_80px_rgb(15_23_42/0.25)]"
       >
         {/* header */}
         <div className="flex items-center justify-between border-b border-tt-hairline px-5 py-3.5">
@@ -89,7 +89,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
               placeholder="My Project"
               aria-label="Project name"
               autoFocus
-              className="mt-1.5 w-full rounded-lg border border-tt-hairline bg-white px-3 py-2 text-[13.5px] text-tt-ink outline-none placeholder:text-tt-ink-3 focus:border-tt-signal/50"
+              className="mt-1.5 w-full rounded-lg border border-tt-hairline bg-tt-card px-3 py-2 text-[13.5px] text-tt-ink outline-none placeholder:text-tt-ink-3 focus:border-tt-signal/50"
             />
           </div>
 
@@ -107,7 +107,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
                 <button
                   type="button"
                   onClick={() => void browseMain()}
-                  className="shrink-0 rounded-md border border-tt-hairline bg-white px-3 py-1 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
+                  className="shrink-0 rounded-md border border-tt-hairline bg-tt-card px-3 py-1 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
                 >
                   Browse
                 </button>
@@ -117,7 +117,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
                 onChange={(e) => setMainFolder(e.target.value)}
                 placeholder="Auto — will create tasksFolder / Name"
                 aria-label="Main folder path"
-                className="font-mono2 mt-2 w-full rounded-md border border-tt-hairline bg-white px-2.5 py-1.5 text-[12px] text-tt-ink outline-none placeholder:text-tt-ink-3 focus:border-tt-signal/50"
+                className="font-mono2 mt-2 w-full rounded-md border border-tt-hairline bg-tt-card px-2.5 py-1.5 text-[12px] text-tt-ink outline-none placeholder:text-tt-ink-3 focus:border-tt-signal/50"
               />
             </div>
           </div>
@@ -134,14 +134,14 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
                 <button
                   type="button"
                   onClick={() => void addSubfolders()}
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-tt-hairline bg-white px-2.5 py-1 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-tt-hairline bg-tt-card px-2.5 py-1 text-[12.5px] font-medium text-tt-ink transition-colors hover:border-tt-signal/50 hover:text-tt-signal"
                 >
                   <Plus size={13} strokeWidth={2.2} />
                   Add subfolders
                 </button>
               </div>
               {subfolders.length === 0 ? (
-                <p className="mt-2 rounded-md bg-white px-2.5 py-2 text-[12.5px] text-tt-ink-3">
+                <p className="mt-2 rounded-md bg-tt-card px-2.5 py-2 text-[12.5px] text-tt-ink-3">
                   No subfolders — click Add to pick folders (multi-select allowed).
                 </p>
               ) : (
@@ -149,7 +149,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
                   {subfolders.map((s) => (
                     <li
                       key={s}
-                      className="flex items-center gap-2 rounded-md bg-white px-2.5 py-1.5"
+                      className="flex items-center gap-2 rounded-md bg-tt-card px-2.5 py-1.5"
                     >
                       <Folder size={13} className="shrink-0 text-tt-ink-3" strokeWidth={1.9} />
                       <span className="font-mono2 min-w-0 flex-1 truncate text-[12px] text-tt-ink">
@@ -176,7 +176,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-tt-hairline bg-white px-4 py-1.5 text-[13px] font-medium text-tt-ink transition-colors hover:border-tt-ink-3"
+            className="rounded-lg border border-tt-hairline bg-tt-card px-4 py-1.5 text-[13px] font-medium text-tt-ink transition-colors hover:border-tt-ink-3"
           >
             Cancel
           </button>
@@ -187,7 +187,7 @@ export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
               onCreate({ name: name.trim(), mainFolder: mainFolder.trim(), subfolders })
             }
             className={cn(
-              'rounded-lg px-4 py-1.5 text-[13px] font-medium text-white transition-all',
+              'rounded-lg px-4 py-1.5 text-[13px] font-medium text-tt-ink-invert transition-all',
               canCreate ? 'bg-tt-ink hover:scale-[1.03]' : 'cursor-not-allowed bg-tt-ink-3/60',
             )}
           >
