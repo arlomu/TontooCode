@@ -1,0 +1,311 @@
+@import 'tailwindcss';
+
+/*
+ * Tontoo design tokens.
+ *
+ * Light-only by design: a white working surface with a cool grey sidebar,
+ * cobalt as the single signal color. Semantic status colors (amber =
+ * running, jade = done, red = failed, violet = reasoning) stay fixed
+ * because they encode state, not decoration.
+ */
+@theme inline {
+  --font-sans: 'Public Sans Variable', 'Public Sans', system-ui, sans-serif;
+  --font-display: 'Archivo Variable', 'Archivo', 'Public Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-tt-ground: var(--tt-ground);
+  --color-tt-panel: var(--tt-panel);
+  --color-tt-card: var(--tt-card);
+  --color-tt-ink: var(--tt-ink);
+  --color-tt-ink-invert: var(--tt-ink-invert);
+  --color-tt-ink-2: var(--tt-ink-2);
+  --color-tt-ink-3: var(--tt-ink-3);
+  --color-tt-hairline: var(--tt-hairline);
+  --color-tt-signal: var(--tt-signal);
+  --color-tt-signal-ink: var(--tt-signal-ink);
+  --color-tt-signal-soft: var(--tt-signal-soft);
+  --color-tt-run: var(--tt-run);
+  --color-tt-run-soft: var(--tt-run-soft);
+  --color-tt-ok: var(--tt-ok);
+  --color-tt-ok-soft: var(--tt-ok-soft);
+  --color-tt-err: var(--tt-err);
+  --color-tt-err-soft: var(--tt-err-soft);
+  --color-tt-thought: var(--tt-thought);
+  --color-tt-thought-soft: var(--tt-thought-soft);
+}
+
+:root {
+  color-scheme: light;
+  --tt-ground: #ffffff;
+  --tt-panel: #eceef1;
+  --tt-card: #ffffff;
+  --tt-ink: #14181d;
+  --tt-ink-invert: #ffffff;
+  --tt-ink-2: #55606d;
+  --tt-ink-3: #8a93a0;
+  --tt-hairline: #dde1e7;
+  --tt-signal: #2547dc;
+  --tt-signal-ink: #ffffff;
+  --tt-signal-soft: #e3e9fc;
+  --tt-run: #9a5b07;
+  --tt-run-soft: #f6ead1;
+  --tt-ok: #0c7a57;
+  --tt-ok-soft: #dcf0e7;
+  --tt-err: #be2e2e;
+  --tt-err-soft: #f8e2e2;
+  --tt-thought: #5f4bc4;
+  --tt-thought-soft: #eae5fa;
+  --tt-beacon: rgb(154 91 7 / 0.35);
+}
+
+/* Full dark instrument theme — applied live via data-theme, session only. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --tt-ground: #14171d;
+  --tt-panel: #0f1319;
+  --tt-card: #1c232d;
+  --tt-ink: #e9ebf0;
+  --tt-ink-invert: #14181d;
+  --tt-ink-2: #a6aebb;
+  --tt-ink-3: #697383;
+  --tt-hairline: #28303c;
+  --tt-signal: #647dff;
+  --tt-signal-ink: #0b0e14;
+  --tt-signal-soft: rgb(100 125 255 / 0.14);
+  --tt-run: #d99a35;
+  --tt-run-soft: rgb(217 154 53 / 0.14);
+  --tt-ok: #3fb68b;
+  --tt-ok-soft: rgb(63 182 139 / 0.13);
+  --tt-err: #e0605f;
+  --tt-err-soft: rgb(224 96 95 / 0.13);
+  --tt-thought: #9b8afb;
+  --tt-thought-soft: rgb(155 138 251 / 0.13);
+  --tt-beacon: rgb(217 154 53 / 0.4);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-tt-ground text-tt-ink antialiased;
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--tt-signal);
+    color: var(--tt-signal-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--tt-signal);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Quiet scrollbars — part of the instrument look. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tt-ink-3) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--tt-ink-3);
+    border-radius: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Custom window decoration: drag region for the title bar strip. */
+.tt-drag {
+  -webkit-app-region: drag;
+}
+.tt-nodrag {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * Pretty scrollbars for the sidebar and conversation panes: a slim floating
+ * thumb (transparent border + padding-box clip) that stays invisible at rest
+ * and fades in on hover.
+ */
+.tt-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.tt-scroll:hover {
+  scrollbar-color: var(--tt-hairline) transparent;
+}
+.tt-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.tt-scroll::-webkit-scrollbar-track,
+.tt-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.tt-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: transparent;
+  background-clip: padding-box;
+}
+.tt-scroll:hover::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--tt-hairline);
+  background-clip: padding-box;
+}
+.tt-scroll::-webkit-scrollbar-thumb:hover {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--tt-ink-3);
+  background-clip: padding-box;
+}
+.tt-scroll::-webkit-scrollbar-thumb:active {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--tt-ink-2);
+  background-clip: padding-box;
+}
+
+/*
+ * Composer scroll: a slim inset rail instead of the OS scrollbar, so the
+ * textarea keeps the flat card look once it passes MAX_LINES.
+ */
+.tt-scrollblock {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tt-hairline) transparent;
+  padding-right: 10px;
+}
+.tt-scrollblock::-webkit-scrollbar {
+  width: 5px;
+}
+.tt-scrollblock::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tt-scrollblock::-webkit-scrollbar-thumb {
+  background: var(--tt-hairline);
+  border-radius: 999px;
+}
+.tt-scrollblock::-webkit-scrollbar-thumb:hover {
+  background: var(--tt-ink-3);
+}
+
+/* Ambient particle drift for the thinking-level band and slider. */
+@keyframes tt-particle {
+  0% {
+    transform: translateY(0) scaleY(0.7);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  75% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(calc(-1 * var(--tt-travel, 96px))) scaleY(1.15);
+    opacity: 0;
+  }
+}
+.tt-particle {
+  animation-name: tt-particle;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+/* Quick swap fade for the level name / trigger label on change. */
+@keyframes tt-swap {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.tt-swap {
+  animation: tt-swap 0.18s ease-out;
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-stretch: 112%;
+    letter-spacing: -0.015em;
+  }
+  .font-mono2 {
+    font-family: var(--font-mono);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Running-tool beacon: a soft pulse on the trace marker. */
+@keyframes tt-beacon {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--tt-beacon);
+  }
+  60% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.tt-beacon {
+  animation: tt-beacon 1.6s ease-out infinite;
+}
+
+/* Streaming caret at the tip of live text. */
+@keyframes tt-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.tt-caret::after {
+  content: '▍';
+  color: var(--tt-signal);
+  animation: tt-caret 0.9s steps(1) infinite;
+  margin-left: 1px;
+}
+
+@keyframes tt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.tt-rise {
+  animation: tt-rise 0.22s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-beacon,
+  .tt-caret::after,
+  .tt-rise,
+  .tt-particle,
+  .tt-swap {
+    animation: none;
+  }
+}

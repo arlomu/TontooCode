@@ -1,0 +1,17 @@
+{
+  "name": "tontoocode",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @tontoocode/ui dev",
+    "desktop": "pnpm --filter @tontoocode/desktop dev",
+    "build": "pnpm --filter @tontoocode/ui build",
+    "preview": "pnpm --filter @tontoocode/ui preview",
+    "typecheck": "pnpm --filter @tontoocode/ui typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.22.0"
+}

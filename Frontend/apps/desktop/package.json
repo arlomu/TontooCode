@@ -1,0 +1,14 @@
+{
+  "name": "@tontoocode/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tontoo desktop shell (Electron) — loads the @tontoocode/ui renderer",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^39.0.0"
+  }
+}
