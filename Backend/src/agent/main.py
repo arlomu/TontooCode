@@ -35,10 +35,12 @@ from .tools import (
     TOOLS_POOL,
     apply_patch as apply_patch_impl,
     edit_file,
+    git_tool,
     glob_files,
     grep_files,
     list_directory,
     read_file,
+    task_tool,
     write_file,
 )
 from .systemprompt import compose as compose_system_prompt
@@ -115,7 +117,7 @@ def prepare_run(
         combined = repo_prompt
     elif instructions:
         combined = instructions
-    agent = build_agent(model_instance, project_dir, instructions=combined)
+    agent = build_agent(model_instance, project_dir, storage, instructions=combined)
     return agent, prompt, history
 
 
@@ -134,6 +136,7 @@ async def _run_tool(name: str, impl, impl_args: tuple) -> str:
 def build_agent(
     model_instance,
     project_dir: str,
+    storage: Storage,
     instructions: str | None = None,
 ) -> Agent:
     """Create the agent with its tools (more plug in here)."""
@@ -235,6 +238,45 @@ def build_agent(
         """
         return await _run_tool(
             "apply_patch", apply_patch_impl, (project_dir, patch)
+        )
+
+    @agent.tool_plain
+    async def git(
+        action: str,
+        message: str = "",
+        files: list[str] | None = None,
+        remote: str = "",
+        branch: str = "",
+        force: bool = False,
+    ) -> str:
+        """Run git actions in the project folder.
+
+        `action` is required (status, diff, commit, push, pull, log).
+        commit needs a `message`; `files` optionally scope the action;
+        push/pull take `remote`/`branch`; push honors `force`.
+        """
+        return await _run_tool(
+            "git",
+            git_tool,
+            (project_dir, action, message, files, remote, branch, force),
+        )
+
+    @agent.tool_plain
+    async def task(
+        action: str,
+        id: int = 0,
+        title: str = "",
+        status: str = "",
+        description: str = "",
+    ) -> str:
+        """Manage big work steps (not small details, max 5 active).
+
+        `action` is required (create, list, done, cancel). create needs a
+        `title`; done/cancel need an `id`; list takes an optional
+        `status` filter.
+        """
+        return await _run_tool(
+            "task", task_tool, (storage, action, id, title, status, description)
         )
 
     return agent

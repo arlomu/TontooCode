@@ -5,10 +5,12 @@ from typing import Any
 
 from .APPLY_PATCH import apply_patch
 from .EDIT import edit_file
+from .GIT import git_tool
 from .GLOB import glob_files
 from .GREP import grep_files
 from .LIST import list_directory
 from .READ import read_file
+from .TASK import task_tool
 from .WRITE import write_file
 from ._common import (
     MAX_GREP_BYTES,
@@ -28,6 +30,8 @@ TOOL_IMPLS: dict[str, Any] = {
     "edit": edit_file,
     "write": write_file,
     "apply_patch": apply_patch,
+    "git": git_tool,
+    "task": task_tool,
 }
 
 __all__ = [
@@ -40,9 +44,11 @@ __all__ = [
     "TOOLS_POOL",
     "apply_patch",
     "edit_file",
+    "git_tool",
     "glob_files",
     "grep_files",
     "list_directory",
     "read_file",
+    "task_tool",
     "write_file",
 ]

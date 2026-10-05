@@ -110,7 +110,25 @@ def build_values(
         values[key] = (
             _read_instruction_file(main_folder, filename) if main_folder else f"%{key}%"
         )
+    values["tasks"] = _format_tasks(storage)
     return values
+
+
+def _format_tasks(storage: Storage) -> str:
+    """Render active tasks for %tasks% (never invent any)."""
+    try:
+        tasks = storage.list_tasks()
+    except Exception:
+        return "(unavailable)"
+    active = [t for t in tasks if t["status"] not in ("done", "cancelled")]
+    if not active:
+        return "(no active tasks)"
+    lines = []
+    for task in active:
+        lines.append(f"- #{task['id']} [{task['status']}] {task['title']}")
+        if task["description"]:
+            lines.append(f"  {task['description']}")
+    return "\n".join(lines)
 
 
 def substitute(text: str, values: dict[str, str]) -> str:

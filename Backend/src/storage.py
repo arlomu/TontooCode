@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS drafts (
     text TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    description TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -305,3 +313,68 @@ class Storage:
                 )
             self._conn.commit()
         return {"project_id": project_id, "text": text if text else ""}
+
+    # ----- tasks (big work steps for the agent) -----
+
+    @staticmethod
+    def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "title": row["title"],
+            "status": row["status"],
+            "description": row["description"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def list_tasks(self, status: str | None = None) -> list[dict[str, Any]]:
+        with self._lock:
+            if status:
+                rows = self._conn.execute(
+                    "SELECT * FROM tasks WHERE status = ? ORDER BY id ASC", (status,)
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT * FROM tasks ORDER BY id ASC"
+                ).fetchall()
+        return [self._row_to_task(r) for r in rows]
+
+    def get_task(self, task_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+        return self._row_to_task(row) if row else None
+
+    def create_task(
+        self, title: str, description: str = "", status: str = "pending"
+    ) -> dict[str, Any]:
+        now = utcnow()
+        with self._lock:
+            cur = self._conn.execute(
+                """INSERT INTO tasks (title, status, description, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (title, status, description, now, now),
+            )
+            self._conn.commit()
+            task_id = cur.lastrowid
+            row = self._conn.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+        assert row is not None
+        return self._row_to_task(row)
+
+    def set_task_status(self, task_id: int, status: str) -> dict[str, Any] | None:
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
+                (status, utcnow(), task_id),
+            )
+            self._conn.commit()
+            if cur.rowcount == 0:
+                return None
+            row = self._conn.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+        assert row is not None
+        return self._row_to_task(row)
