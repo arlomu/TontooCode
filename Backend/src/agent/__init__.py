@@ -3,7 +3,7 @@ from .main import build_agent, prepare_run, stream_run
 from .provider import AgentError, build_model
 from .storage import build_title, create_chat
 from .stream import error_chunk
-from .systemprompt import build_values, compose, load_parts, substitute
+from .systemprompt import build_values, compose, load_parts, substitute, working_dir
 
 __all__ = [
     "AgentError",
@@ -18,4 +18,5 @@ __all__ = [
     "prepare_run",
     "stream_run",
     "substitute",
+    "working_dir",
 ]

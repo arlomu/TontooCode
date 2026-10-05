@@ -30,6 +30,7 @@ from storage import Storage
 
 from .provider import AgentError, build_model
 from .stream import _sse, error_chunk
+from .systemprompt import working_dir
 from .tools import (
     TOOL_TIMEOUT,
     TOOLS_POOL,
@@ -104,8 +105,7 @@ def prepare_run(
     """Build the agent, prompt and history eagerly (raises before streaming)."""
     model_name = (model or "").strip()
     model_instance = build_model(storage, model_name)
-    project = storage.get_project(project_id) if project_id else None
-    project_dir = project["main_folder"] if project else ""
+    _, project_dir, _ = working_dir(storage, project_id.strip())
     instructions, history, prompt = split_history(flatten_transcript(messages or []))
     repo_prompt = compose_system_prompt(
         storage, model=model_name, chat_id=chat_id, project_id=project_id

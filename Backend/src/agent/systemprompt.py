@@ -30,6 +30,13 @@ MAX_FILE_CHARS = 20000
 
 INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", "CURSOR.md")
 
+#: Shell fallback per OS when no shell is configured.
+DEFAULT_SHELLS = {
+    "Windows": "Git Bash — default",
+    "Darwin": "Terminal — default",
+    "Linux": "Bash — default",
+}
+
 
 def prompts_dir() -> Path | None:
     """Locate prompts/systemprompts (env override or repo-relative)."""
@@ -68,6 +75,25 @@ def _read_instruction_file(folder: str, filename: str) -> str:
     return text[:MAX_FILE_CHARS]
 
 
+def _setting(settings: dict, key: str) -> str:
+    value = settings.get(key, "")
+    return str(value) if isinstance(value, (str, int, float, bool)) else ""
+
+
+def working_dir(storage: Storage, project_id: str) -> tuple[dict | None, str, bool]:
+    """Resolve the effective working folder: project folder, else tasks folder.
+
+    Returns (project or None, folder, is_fallback).
+    """
+    project = storage.get_project(project_id) if project_id else None
+    folder = project["main_folder"] if project else ""
+    if folder:
+        return project, folder, False
+    settings = storage.get_all_settings()
+    fallback = _setting(settings, "general.folder")
+    return project, fallback, True
+
+
 def build_values(
     storage: Storage, *, model: str, chat_id: str, project_id: str
 ) -> dict[str, str]:
@@ -75,13 +101,12 @@ def build_values(
     settings = storage.get_all_settings()
 
     def setting(key: str) -> str:
-        value = settings.get(key, "")
-        return str(value) if isinstance(value, (str, int, float, bool)) else ""
+        return _setting(settings, key)
 
     now = datetime.now().astimezone()
-    project = storage.get_project(project_id) if project_id else None
-    main_folder = project["main_folder"] if project else ""
+    project, main_folder, is_fallback = working_dir(storage, project_id)
     subfolders = project["subfolders"] if project else []
+    shell = setting("general.shell") or DEFAULT_SHELLS.get(platform.system(), "")
     values: dict[str, str] = {
         "date": now.strftime("%Y-%m-%d"),
         "time": now.strftime("%H:%M:%S"),
@@ -89,10 +114,13 @@ def build_values(
         "timezone": now.strftime("%Z"),
         "datetime": now.isoformat(timespec="seconds"),
         "os": platform.system(),
-        "shell": setting("general.shell"),
+        "shell": shell,
         "project_id": project["id"] if project else "",
         "project_name": project["name"] if project else "",
-        "project_main_folder": main_folder,
+        "project_main_folder": (
+            f"{main_folder} (fallback: tasks folder)" if is_fallback and main_folder
+            else main_folder
+        ),
         "project_subfolders": ", ".join(subfolders) if subfolders else "(none)",
         "user_name": setting("personalization.name"),
         "model": model,
