@@ -792,8 +792,23 @@ export default function App() {
     async (id: string, text: string) => {
       // Clear exactly the draft the composer displays, then un-pend.
       clearDraft(id);
-      delete pendingRef.current[projectOf(id)];
+      const projectId = projectOf(id);
+      delete pendingRef.current[projectId];
       await ensureBackendChat(id, text);
+      // Optimistic sidebar entry — persist() overwrites it on finish.
+      const title = text.slice(0, 48) + (text.length > 48 ? '…' : '');
+      setMetas((prev) => [
+        {
+          id,
+          title,
+          updatedAt: Date.now(),
+          messageCount: 1,
+          toolCount: 0,
+          projectId,
+        },
+        ...prev.filter((m) => m.id !== id),
+      ]);
+      setExpanded((prev) => new Set(prev).add(projectId));
     },
     [clearDraft, ensureBackendChat, projectOf],
   );
