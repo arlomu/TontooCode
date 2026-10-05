@@ -42,6 +42,15 @@ export interface BackendProvider {
   updated_at: string;
 }
 
+export interface BackendProject {
+  id: string;
+  name: string;
+  main_folder: string;
+  subfolders: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CatalogProvider {
   id: string;
   name: string;
@@ -56,7 +65,19 @@ export interface CatalogModels {
 
 export const backend = {
   health: () => request<{ status: string }>('/api/health'),
+  getSettings: () => request<Record<string, unknown>>('/api/settings'),
+  putSettings: (patch: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    }),
   listProviders: () => request<BackendProvider[]>('/api/providers'),
+  listProjects: () => request<BackendProject[]>('/api/projects'),
+  createProject: (name: string, main_folder: string, subfolders: string[]) =>
+    request<BackendProject>('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name, main_folder, subfolders }),
+    }),
   addProvider: (name: string, api_key: string) =>
     request<BackendProvider>('/api/providers', {
       method: 'POST',

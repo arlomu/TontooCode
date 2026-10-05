@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import type { TontooMessage } from '@/types';
+import { backend } from '@/lib/backend';
 import { createTransport } from '@/lib/transport';
 import {
   DEFAULT_PROJECT_ID,
@@ -154,25 +155,61 @@ export default function App() {
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [view, setView] = useState<'chat' | 'settings'>('chat');
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
-  // Appearance — session only, never persisted. Default is Light.
+  // Appearance — persisted to the backend DB when reachable.
   const [design, setDesign] = useState<DesignMode>('light');
   const [presetId, setPresetId] = useState(DEFAULT_PRESET_ID);
   const [colorOverrides, setColorOverrides] = useState<ColorOverrides>({});
+  const colorOverridesRef = useRef<ColorOverrides>({});
+  colorOverridesRef.current = colorOverrides;
 
-  const setColorOverride = useCallback((key: keyof ColorOverrides, value: string | undefined) => {
-    setColorOverrides((prev) => {
-      if (value === undefined) {
-        const { [key]: _drop, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [key]: value };
-    });
+  // Debounced write-through to settings.db (silent when offline).
+  const pendingSettings = useRef<Record<string, unknown>>({});
+  const persistTimer = useRef<number | null>(null);
+  const persistAppearance = useCallback((patch: Record<string, unknown>) => {
+    Object.assign(pendingSettings.current, patch);
+    if (persistTimer.current !== null) window.clearTimeout(persistTimer.current);
+    persistTimer.current = window.setTimeout(() => {
+      const body = pendingSettings.current;
+      pendingSettings.current = {};
+      persistTimer.current = null;
+      void backend.putSettings(body).catch(() => {});
+    }, 400);
   }, []);
+
+  const handleDesign = useCallback(
+    (d: DesignMode) => {
+      setDesign(d);
+      persistAppearance({ 'appearance.design': d });
+    },
+    [persistAppearance],
+  );
+
+  const handlePreset = useCallback(
+    (id: string) => {
+      setPresetId(id);
+      persistAppearance({ 'appearance.preset': id });
+    },
+    [persistAppearance],
+  );
+
+  const handleColorOverride = useCallback(
+    (key: keyof ColorOverrides, value: string | undefined) => {
+      const next = { ...colorOverridesRef.current };
+      if (value === undefined) delete next[key];
+      else next[key] = value;
+      colorOverridesRef.current = next;
+      setColorOverrides(next);
+      persistAppearance({ 'appearance.overrides': next });
+    },
+    [persistAppearance],
+  );
 
   const resetTheme = useCallback(() => {
     setPresetId(DEFAULT_PRESET_ID);
     setColorOverrides({});
-  }, []);
+    colorOverridesRef.current = {};
+    persistAppearance({ 'appearance.preset': DEFAULT_PRESET_ID, 'appearance.overrides': {} });
+  }, [persistAppearance]);
 
   // Personalization — session only, never persisted.
   const [personalization, setPersonalization] = useState<Personalization>(DEFAULT_PERSONALIZATION);
@@ -233,36 +270,6 @@ export default function App() {
   // Projects start collapsed; per-project visible-chat limits for paging.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [limits, setLimits] = useState<Record<string, number>>({});
-  // In-session projects (NOT persisted anywhere yet — gone on reload).
-  const [customProjects, setCustomProjects] = useState<{ id: string; name: string }[]>([]);
-  // Folder details, session-only as well.
-  const [projectDetails, setProjectDetails] = useState<Record<string, NewProject>>({});
-  void projectDetails;
-
-  const allProjects = useMemo(
-    () => [...PROJECTS, ...customProjects],
-    [customProjects],
-  );
-
-  /** Projects enriched with their session-only main folder for the picker. */
-  const projectsWithFolders = useMemo(
-    () =>
-      allProjects.map((p) => ({
-        ...p,
-        mainFolder: projectDetails[p.id]?.mainFolder || undefined,
-      })),
-    [allProjects, projectDetails],
-  );
-
-  const addProject = useCallback((p: NewProject) => {
-    const id = `custom-${Date.now()}`;
-    setCustomProjects((prev) => [...prev, { id, name: p.name }]);
-    setProjectDetails((prev) => ({ ...prev, [id]: p }));
-    // New chats land in the fresh project and reveal it.
-    lastProject.current = id;
-    setDraftProject(id);
-    setExpanded((prev) => new Set(prev).add(id));
-  }, []);
   // Where the next chat lands: the project of the last opened chat.
   const lastProject = useRef(DEFAULT_PROJECT_ID);
   const newChatProject = useRef(DEFAULT_PROJECT_ID);
@@ -270,10 +277,52 @@ export default function App() {
   const [draftProject, setDraftProject] = useState(DEFAULT_PROJECT_ID);
   const draftProjectRef = useRef(draftProject);
   draftProjectRef.current = draftProject;
+  // Backend-backed projects with local fallback while offline.
+  const [allProjects, setAllProjects] = useState<
+    { id: string; name: string; mainFolder?: string; subfolders?: string[] }[]
+  >(() => PROJECTS.map((p) => ({ ...p })));
+  const [projectsOnline, setProjectsOnline] = useState(true);
+  void projectsOnline;
+
+  /** Projects enriched with their main folder for the picker. */
+  const projectsWithFolders = useMemo(() => allProjects, [allProjects]);
+
+  const addProject = useCallback((p: NewProject) => {
+    const applyNewProject = (id: string, name: string, mainFolder?: string, subfolders?: string[]) => {
+      setAllProjects((prev) =>
+        prev.some((x) => x.id === id) ? prev : [...prev, { id, name, mainFolder, subfolders }],
+      );
+      // New chats land in the fresh project and reveal it.
+      lastProject.current = id;
+      setDraftProject(id);
+      setExpanded((prev) => new Set(prev).add(id));
+    };
+    void backend
+      .createProject(p.name, p.mainFolder, p.subfolders)
+      .then((created) => {
+        setProjectsOnline(true);
+        applyNewProject(
+          created.id,
+          created.name,
+          created.main_folder || undefined,
+          created.subfolders,
+        );
+      })
+      .catch(() => {
+        setProjectsOnline(false);
+        applyNewProject(
+          `custom-${Date.now()}`,
+          p.name,
+          p.mainFolder || undefined,
+          p.subfolders,
+        );
+      });
+  }, []);
 
   // (The design/preset effects above own data-theme; nothing is persisted.)
 
-  // Boot: list chats, open the most recent one (or a fresh chat).
+  // Boot: list chats, open the most recent one (or a fresh chat),
+  // and restore appearance + projects from the backend DB when reachable.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -291,6 +340,45 @@ export default function App() {
         /* fresh start on storage failure */
       } finally {
         if (!cancelled) setLoading(false);
+      }
+      try {
+        const stored = await backend.listProjects();
+        if (cancelled) return;
+        setProjectsOnline(true);
+        setAllProjects(
+          stored.map((p) => ({
+            id: p.id,
+            name: p.name,
+            mainFolder: p.main_folder || undefined,
+            subfolders: p.subfolders,
+          })),
+        );
+      } catch {
+        /* backend offline — local PROJECTS fallback stands */
+        if (!cancelled) setProjectsOnline(false);
+      }
+      try {
+        const s = await backend.getSettings();
+        if (cancelled) return;
+        const design = s['appearance.design'];
+        if (design === 'system' || design === 'light' || design === 'dark') setDesign(design);
+        const preset = s['appearance.preset'];
+        if (typeof preset === 'string' && PRESETS.some((p) => p.id === preset)) {
+          setPresetId(preset);
+        }
+        const overrides = s['appearance.overrides'];
+        if (overrides && typeof overrides === 'object' && !Array.isArray(overrides)) {
+          const clean: ColorOverrides = {};
+          for (const [k, v] of Object.entries(overrides)) {
+            if ((k === 'accent' || k === 'background' || k === 'foreground') && typeof v === 'string') {
+              clean[k] = v;
+            }
+          }
+          setColorOverrides(clean);
+          colorOverridesRef.current = clean;
+        }
+      } catch {
+        /* backend offline — Light defaults stand */
       }
     })();
     return () => {
@@ -457,11 +545,11 @@ return (
                 tab={settingsTab}
                 appearance={{
                   design,
-                  onDesign: setDesign,
+                  onDesign: handleDesign,
                   presetId,
-                  onPreset: setPresetId,
+                  onPreset: handlePreset,
                   overrides: colorOverrides,
-                  onOverride: setColorOverride,
+                  onOverride: handleColorOverride,
                   onResetTheme: resetTheme,
                 }}
                 personalization={{

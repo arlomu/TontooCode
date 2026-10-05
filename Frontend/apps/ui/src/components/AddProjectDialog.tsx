@@ -26,7 +26,7 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="mt-1 text-[12.5px] leading-relaxed text-tt-ink-2">{children}</p>;
 }
 
-/** Add-project dialog. Session-only: nothing is persisted anywhere yet. */
+/** Add-project dialog. Created projects are persisted via the backend. */
 export function AddProjectDialog({ onCreate, onClose }: AddProjectDialogProps) {
   const [name, setName] = useState('');
   const [mainFolder, setMainFolder] = useState('');

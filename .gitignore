@@ -47,3 +47,6 @@ pnpm-debug.log*
 
 # Local agent data
 .tontoo/
+
+# Generated installer payload (built by InstallerEXE/build_installer.py)
+InstallerEXE/payload/
