@@ -81,7 +81,7 @@ export interface BrowserUseProps {
 
 /**
  * Browser Use settings (no search-engine card by design).
- * Session-only state lives in App; nothing is persisted anywhere.
+ * State lives in App and is persisted to the backend DB when reachable.
  */
 export function BrowserUseTab({ value, onPatch }: BrowserUseProps) {
   return (

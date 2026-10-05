@@ -117,8 +117,8 @@ export interface PersonalizationProps {
 }
 
 /**
- * Personalization settings — how the assistant answers. Session-only state
- * lives in App (survives tab switches); nothing is persisted anywhere.
+ * Personalization settings — how the assistant answers. State lives in App
+ * (survives tab switches) and is persisted to the backend DB when reachable.
  */
 export function PersonalizationTab({ value, onPatch }: PersonalizationProps) {
   return (

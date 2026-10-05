@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Bell, ChevronDown, Folder, SquareTerminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -67,19 +66,39 @@ function platformId(): string {
   return 'win32';
 }
 
-export function GeneralTab() {
-  // Session-only on purpose: nothing is persisted anywhere yet.
-  const [folder, setFolder] = useState('C:\\Users\\username\\tflow');
-  const [shell, setShell] = useState(SHELLS[platformId()]![0]!);
-  const [notify, setNotify] = useState(true);
-  const [sound, setSound] = useState(true);
+export interface GeneralSettings {
+  folder: string;
+  shell: string;
+  notify: boolean;
+  sound: boolean;
+}
 
+export const DEFAULT_GENERAL_FOLDER = 'C:\\Users\\username\\tflow';
+
+/** Platform-aware defaults (shell depends on the detected OS). */
+export function defaultGeneral(): GeneralSettings {
+  return {
+    folder: DEFAULT_GENERAL_FOLDER,
+    shell: SHELLS[platformId()]![0]!,
+    notify: true,
+    sound: true,
+  };
+}
+
+export function GeneralTab({
+  value,
+  onPatch,
+}: {
+  value: GeneralSettings;
+  onPatch: (patch: Partial<GeneralSettings>) => void;
+}) {
+  const { folder, shell, notify, sound } = value;
   const platform = platformId();
   const shells = SHELLS[platform] ?? SHELLS.win32!;
 
   const changeFolder = async () => {
     const folders = await window.tontoo?.pickFolder?.().catch(() => [] as string[]);
-    if (folders && folders.length > 0) setFolder(folders[0]!);
+    if (folders && folders.length > 0) onPatch({ folder: folders[0]! });
   };
 
   return (
@@ -120,7 +139,7 @@ export function GeneralTab() {
           <div className="relative shrink-0">
             <select
               value={shells.includes(shell) ? shell : shells[0]!}
-              onChange={(e) => setShell(e.target.value)}
+              onChange={(e) => onPatch({ shell: e.target.value })}
               aria-label="Shell"
               className="cursor-pointer appearance-none rounded-lg border border-tt-hairline bg-tt-card py-2 pr-9 pl-3.5 text-[13px] font-medium text-tt-ink outline-none transition-colors hover:border-tt-signal/50"
             >
@@ -148,7 +167,7 @@ export function GeneralTab() {
               Show a Windows notification when an agent completes a task. Default on.
             </p>
           </div>
-          <Toggle checked={notify} onChange={setNotify} label="Notify when agent is finished" />
+          <Toggle checked={notify} onChange={(v) => onPatch({ notify: v })} label="Notify when agent is finished" />
         </div>
         <div className="mt-4 flex items-center justify-between gap-4 border-t border-tt-hairline pt-4">
           <div className="min-w-0">
@@ -157,7 +176,7 @@ export function GeneralTab() {
               Play a short sound when an agent completes a task. Can be disabled.
             </p>
           </div>
-          <Toggle checked={sound} onChange={setSound} label="Play sound when agent is finished" />
+          <Toggle checked={sound} onChange={(v) => onPatch({ sound: v })} label="Play sound when agent is finished" />
         </div>
       </Card>
 

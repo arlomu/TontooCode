@@ -16,6 +16,7 @@ import {
 import { Sidebar, PAGE_STEP, PAGE_SIZE } from '@/components/Sidebar';
 import { SettingsNav, type SettingsTab } from '@/components/settings/SettingsNav';
 import { SettingsContent } from '@/components/settings/SettingsContent';
+import { defaultGeneral, type GeneralSettings } from '@/components/settings/GeneralTab';
 import {
   DEFAULT_PRESET_ID,
   PRESETS,
@@ -38,6 +39,7 @@ import type { ProvidersState } from '@/components/settings/ProvidersTab';
 import type { NewProject } from '@/components/AddProjectDialog';
 import { TitleBar } from '@/components/TitleBar';
 import { DEFAULT_MODEL } from '@/components/ModelMenu';
+import { DEFAULT_LEVEL, LEVELS, type ThinkingLevel } from '@/components/ThinkingLevelMenu';
 import { Conversation } from '@/components/Conversation';
 import { Composer } from '@/components/Composer';
 
@@ -70,6 +72,8 @@ interface WorkspaceProps {
   onPersist: (id: string, messages: TontooMessage[]) => void;
   model: string;
   onModelChange: (id: string) => void;
+  level: ThinkingLevel;
+  onLevelChange: (level: ThinkingLevel) => void;
   draftProject: string;
   onDraftProjectChange: (id: string) => void;
   onAddProject: (project: NewProject) => void;
@@ -86,6 +90,8 @@ function Workspace({
   onPersist,
   model,
   onModelChange,
+  level,
+  onLevelChange,
   draftProject,
   onDraftProjectChange,
   onAddProject,
@@ -139,6 +145,8 @@ function Workspace({
           status={status}
           model={model}
           onModelChange={onModelChange}
+          level={level}
+          onLevelChange={onLevelChange}
           onSend={send}
           onStop={stop}
         />
@@ -153,6 +161,7 @@ export default function App() {
   const [initial, setInitial] = useState<TontooMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState(DEFAULT_MODEL);
+  const [level, setLevel] = useState<ThinkingLevel>(DEFAULT_LEVEL);
   const [view, setView] = useState<'chat' | 'settings'>('chat');
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
   // Appearance — persisted to the backend DB when reachable.
@@ -165,7 +174,7 @@ export default function App() {
   // Debounced write-through to settings.db (silent when offline).
   const pendingSettings = useRef<Record<string, unknown>>({});
   const persistTimer = useRef<number | null>(null);
-  const persistAppearance = useCallback((patch: Record<string, unknown>) => {
+  const persistSettings = useCallback((patch: Record<string, unknown>) => {
     Object.assign(pendingSettings.current, patch);
     if (persistTimer.current !== null) window.clearTimeout(persistTimer.current);
     persistTimer.current = window.setTimeout(() => {
@@ -179,17 +188,17 @@ export default function App() {
   const handleDesign = useCallback(
     (d: DesignMode) => {
       setDesign(d);
-      persistAppearance({ 'appearance.design': d });
+      persistSettings({ 'appearance.design': d });
     },
-    [persistAppearance],
+    [persistSettings],
   );
 
   const handlePreset = useCallback(
     (id: string) => {
       setPresetId(id);
-      persistAppearance({ 'appearance.preset': id });
+      persistSettings({ 'appearance.preset': id });
     },
-    [persistAppearance],
+    [persistSettings],
   );
 
   const handleColorOverride = useCallback(
@@ -199,35 +208,107 @@ export default function App() {
       else next[key] = value;
       colorOverridesRef.current = next;
       setColorOverrides(next);
-      persistAppearance({ 'appearance.overrides': next });
+      persistSettings({ 'appearance.overrides': next });
     },
-    [persistAppearance],
+    [persistSettings],
   );
 
   const resetTheme = useCallback(() => {
     setPresetId(DEFAULT_PRESET_ID);
     setColorOverrides({});
     colorOverridesRef.current = {};
-    persistAppearance({ 'appearance.preset': DEFAULT_PRESET_ID, 'appearance.overrides': {} });
-  }, [persistAppearance]);
+    persistSettings({ 'appearance.preset': DEFAULT_PRESET_ID, 'appearance.overrides': {} });
+  }, [persistSettings]);
 
-  // Personalization — session only, never persisted.
+  const handleModelChange = useCallback(
+    (id: string) => {
+      setModel(id);
+      persistSettings({ 'chat.model': id });
+    },
+    [persistSettings],
+  );
+
+  const handleLevelChange = useCallback(
+    (next: ThinkingLevel) => {
+      setLevel(next);
+      persistSettings({ 'chat.thinking_level': next });
+    },
+    [persistSettings],
+  );
+
+  // General — persisted to the backend DB when reachable.
+  const [general, setGeneral] = useState<GeneralSettings>(() => defaultGeneral());
+  const patchGeneral = useCallback(
+    (patch: Partial<GeneralSettings>) => {
+      setGeneral((prev) => ({ ...prev, ...patch }));
+      persistSettings({
+        ...(patch.folder !== undefined ? { 'general.folder': patch.folder } : {}),
+        ...(patch.shell !== undefined ? { 'general.shell': patch.shell } : {}),
+        ...(patch.notify !== undefined ? { 'general.notify': patch.notify } : {}),
+        ...(patch.sound !== undefined ? { 'general.sound': patch.sound } : {}),
+      });
+    },
+    [persistSettings],
+  );
+
+  // Personalization — persisted to the backend DB when reachable.
   const [personalization, setPersonalization] = useState<Personalization>(DEFAULT_PERSONALIZATION);
-  const patchPersonalization = useCallback((patch: Partial<Personalization>) => {
-    setPersonalization((prev) => ({ ...prev, ...patch }));
-  }, []);
+  const patchPersonalization = useCallback(
+    (patch: Partial<Personalization>) => {
+      setPersonalization((prev) => ({ ...prev, ...patch }));
+      persistSettings({
+        ...(patch.name !== undefined ? { 'personalization.name': patch.name } : {}),
+        ...(patch.hobbies !== undefined ? { 'personalization.hobbies': patch.hobbies } : {}),
+        ...(patch.about !== undefined ? { 'personalization.about': patch.about } : {}),
+        ...(patch.emojis !== undefined ? { 'personalization.emojis': patch.emojis } : {}),
+        ...(patch.structure !== undefined ? { 'personalization.structure': patch.structure } : {}),
+        ...(patch.detail !== undefined ? { 'personalization.detail': patch.detail } : {}),
+        ...(patch.tone !== undefined ? { 'personalization.tone': patch.tone } : {}),
+      });
+    },
+    [persistSettings],
+  );
 
-  // Computer Use — session only, never persisted.
+  // Computer Use — persisted to the backend DB when reachable.
   const [computerUse, setComputerUse] = useState<ComputerUse>(DEFAULT_COMPUTER_USE);
-  const patchComputerUse = useCallback((patch: Partial<ComputerUse>) => {
-    setComputerUse((prev) => ({ ...prev, ...patch }));
-  }, []);
+  const patchComputerUse = useCallback(
+    (patch: Partial<ComputerUse>) => {
+      setComputerUse((prev) => ({ ...prev, ...patch }));
+      persistSettings({
+        ...(patch.enabled !== undefined ? { 'computer_use.enabled': patch.enabled } : {}),
+        ...(patch.selectionMode !== undefined
+          ? { 'computer_use.selection_mode': patch.selectionMode }
+          : {}),
+        ...(patch.selectedApps !== undefined
+          ? { 'computer_use.selected_apps': patch.selectedApps }
+          : {}),
+        ...(patch.cursorColor !== undefined
+          ? { 'computer_use.cursor_color': patch.cursorColor }
+          : {}),
+      });
+    },
+    [persistSettings],
+  );
 
-  // Browser Use — session only, never persisted.
+  // Browser Use — persisted to the backend DB when reachable.
   const [browserUse, setBrowserUse] = useState<BrowserUse>(DEFAULT_BROWSER_USE);
-  const patchBrowserUse = useCallback((patch: Partial<BrowserUse>) => {
-    setBrowserUse((prev) => ({ ...prev, ...patch }));
-  }, []);
+  const patchBrowserUse = useCallback(
+    (patch: Partial<BrowserUse>) => {
+      setBrowserUse((prev) => ({ ...prev, ...patch }));
+      persistSettings({
+        ...(patch.openLinksWith !== undefined
+          ? { 'browser_use.open_links_with': patch.openLinksWith }
+          : {}),
+        ...(patch.clearBrowsingData !== undefined
+          ? { 'browser_use.clear_browsing_data': patch.clearBrowsingData }
+          : {}),
+        ...(patch.cursorColor !== undefined
+          ? { 'browser_use.cursor_color': patch.cursorColor }
+          : {}),
+      });
+    },
+    [persistSettings],
+  );
 
   // Providers — backend-backed list with session fallback while offline.
   const [providers, setProviders] = useState<ProvidersState>({ providers: [], online: true });
@@ -377,6 +458,119 @@ export default function App() {
           setColorOverrides(clean);
           colorOverridesRef.current = clean;
         }
+        // General, personalization, computer/browser use, model and level.
+        // Stored values win only when they pass a strict type check.
+        const str = (v: unknown): string | undefined =>
+          typeof v === 'string' ? v : undefined;
+        const bool = (v: unknown): boolean | undefined =>
+          typeof v === 'boolean' ? v : undefined;
+        const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | undefined =>
+          typeof v === 'string' && (allowed as readonly string[]).includes(v)
+            ? (v as T)
+            : undefined;
+        const strArr = (v: unknown): string[] | undefined =>
+          Array.isArray(v) && v.every((x) => typeof x === 'string') ? [...v] : undefined;
+        const nonEmpty = (v: unknown): string | undefined =>
+          typeof v === 'string' && v.length > 0 ? v : undefined;
+        const generalNext: GeneralSettings = { ...defaultGeneral() };
+        const folder = str(s['general.folder']);
+        if (folder !== undefined) generalNext.folder = folder;
+        const shell = nonEmpty(s['general.shell']);
+        if (shell !== undefined) generalNext.shell = shell;
+        const notify = bool(s['general.notify']);
+        if (notify !== undefined) generalNext.notify = notify;
+        const sound = bool(s['general.sound']);
+        if (sound !== undefined) generalNext.sound = sound;
+        setGeneral(generalNext);
+        setPersonalization((prev) => ({
+          ...prev,
+          ...(str(s['personalization.name']) !== undefined
+            ? { name: str(s['personalization.name'])! }
+            : {}),
+          ...(str(s['personalization.hobbies']) !== undefined
+            ? { hobbies: str(s['personalization.hobbies'])! }
+            : {}),
+          ...(str(s['personalization.about']) !== undefined
+            ? { about: str(s['personalization.about'])! }
+            : {}),
+          ...(oneOf(s['personalization.emojis'], ['many', 'some', 'few', 'none'] as const) !==
+          undefined
+            ? {
+                emojis: oneOf(
+                  s['personalization.emojis'],
+                  ['many', 'some', 'few', 'none'] as const,
+                )!,
+              }
+            : {}),
+          ...(oneOf(s['personalization.structure'], ['many', 'some', 'few'] as const) !==
+          undefined
+            ? {
+                structure: oneOf(
+                  s['personalization.structure'],
+                  ['many', 'some', 'few'] as const,
+                )!,
+              }
+            : {}),
+          ...(oneOf(s['personalization.detail'], [
+            'technical',
+            'non-technical',
+            'normal',
+          ] as const) !== undefined
+            ? {
+                detail: oneOf(s['personalization.detail'], [
+                  'technical',
+                  'non-technical',
+                  'normal',
+                ] as const)!,
+              }
+            : {}),
+          ...(oneOf(s['personalization.tone'], ['instructive', 'creative', 'factual'] as const) !==
+          undefined
+            ? {
+                tone: oneOf(s['personalization.tone'], [
+                  'instructive',
+                  'creative',
+                  'factual',
+                ] as const)!,
+              }
+            : {}),
+        }));
+        setComputerUse((prev) => ({
+          ...prev,
+          ...(bool(s['computer_use.enabled']) !== undefined
+            ? { enabled: bool(s['computer_use.enabled'])! }
+            : {}),
+          ...(oneOf(s['computer_use.selection_mode'], ['allow', 'block'] as const) !== undefined
+            ? {
+                selectionMode: oneOf(s['computer_use.selection_mode'], [
+                  'allow',
+                  'block',
+                ] as const)!,
+              }
+            : {}),
+          ...(strArr(s['computer_use.selected_apps']) !== undefined
+            ? { selectedApps: strArr(s['computer_use.selected_apps'])! }
+            : {}),
+          ...(str(s['computer_use.cursor_color']) !== undefined
+            ? { cursorColor: str(s['computer_use.cursor_color'])! }
+            : {}),
+        }));
+        setBrowserUse((prev) => ({
+          ...prev,
+          ...(str(s['browser_use.open_links_with']) !== undefined
+            ? { openLinksWith: str(s['browser_use.open_links_with'])! }
+            : {}),
+          ...(bool(s['browser_use.clear_browsing_data']) !== undefined
+            ? { clearBrowsingData: bool(s['browser_use.clear_browsing_data'])! }
+            : {}),
+          ...(str(s['browser_use.cursor_color']) !== undefined
+            ? { cursorColor: str(s['browser_use.cursor_color'])! }
+            : {}),
+        }));
+        const storedModel = nonEmpty(s['chat.model']);
+        if (storedModel !== undefined) setModel(storedModel);
+        const storedLevel = oneOf(s['chat.thinking_level'], LEVELS);
+        if (storedLevel !== undefined) setLevel(storedLevel);
       } catch {
         /* backend offline — Light defaults stand */
       }
@@ -533,7 +727,9 @@ return (
               initialMessages={initial}
               onPersist={persist}
               model={model}
-              onModelChange={setModel}
+              onModelChange={handleModelChange}
+              level={level}
+              onLevelChange={handleLevelChange}
               draftProject={draftProject}
               onDraftProjectChange={setDraftProject}
               onAddProject={addProject}
@@ -543,6 +739,10 @@ return (
             <div className="min-w-0 flex-1">
               <SettingsContent
                 tab={settingsTab}
+                general={{
+                  value: general,
+                  onPatch: patchGeneral,
+                }}
                 appearance={{
                   design,
                   onDesign: handleDesign,

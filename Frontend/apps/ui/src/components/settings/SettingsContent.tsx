@@ -1,5 +1,5 @@
 import type { SettingsTab } from './SettingsNav';
-import { GeneralTab } from './GeneralTab';
+import { GeneralTab, type GeneralSettings } from './GeneralTab';
 import { AppearanceTab, type AppearanceState } from './AppearanceTab';
 import { PersonalizationTab, type Personalization } from './PersonalizationTab';
 import { ComputerUseTab, type ComputerUse } from './ComputerUseTab';
@@ -23,6 +23,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
 /** Right-hand settings content. */
 export function SettingsContent({
   tab,
+  general,
   appearance,
   personalization,
   computerUse,
@@ -30,6 +31,10 @@ export function SettingsContent({
   providers,
 }: {
   tab: SettingsTab;
+  general: {
+    value: GeneralSettings;
+    onPatch: (patch: Partial<GeneralSettings>) => void;
+  };
   appearance: AppearanceState;
   personalization: {
     value: Personalization;
@@ -51,7 +56,7 @@ export function SettingsContent({
   if (tab === 'general') {
     return (
       <div className="tt-scroll h-full overflow-y-auto">
-        <GeneralTab />
+        <GeneralTab value={general.value} onPatch={general.onPatch} />
       </div>
     );
   }

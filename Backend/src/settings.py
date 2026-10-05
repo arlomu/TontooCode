@@ -1,7 +1,8 @@
 """Settings registry: known keys, product defaults, light validation.
 
 Mirrors the frontend sections (General, Appearance, Personalization,
-Computer Use, Browser Use) so UI and API speak the same key vocabulary.
+Computer Use, Browser Use) plus the active chat state (model and thinking
+level) so UI and API speak the same key vocabulary.
 All state is RAM + SQLite only; chats are not part of this module.
 """
 from __future__ import annotations
@@ -37,6 +38,9 @@ DEFAULTS: dict[str, Any] = {
     "browser_use.open_links_with": "System Default",
     "browser_use.clear_browsing_data": True,
     "browser_use.cursor_color": "#7D24EB",
+    # chat
+    "chat.model": "opencode/space-bunny-free",
+    "chat.thinking_level": "medium",
 }
 
 ALLOWED_KEYS = frozenset(DEFAULTS)

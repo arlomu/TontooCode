@@ -3,7 +3,6 @@ import { ArrowUp, Mic, Plus, Square } from 'lucide-react';
 import type { ChatStatus } from 'ai';
 import { cn } from '@/lib/utils';
 import {
-  DEFAULT_LEVEL,
   ThinkingLevelMenu,
   type ThinkingLevel,
 } from '@/components/ThinkingLevelMenu';
@@ -18,13 +17,14 @@ interface ComposerProps {
   status: ChatStatus;
   model: string;
   onModelChange: (id: string) => void;
+  level: ThinkingLevel;
+  onLevelChange: (level: ThinkingLevel) => void;
   onSend: (text: string) => void;
   onStop: () => void;
 }
 
-export function Composer({ status, model, onModelChange, onSend, onStop }: ComposerProps) {
+export function Composer({ status, model, onModelChange, level, onLevelChange, onSend, onStop }: ComposerProps) {
   const [value, setValue] = useState('');
-  const [level, setLevel] = useState<ThinkingLevel>(DEFAULT_LEVEL);
   const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -172,7 +172,7 @@ export function Composer({ status, model, onModelChange, onSend, onStop }: Compo
             {/* model */}
             <ModelMenu value={model} onChange={onModelChange} />
             {/* thinking level */}
-            <ThinkingLevelMenu value={level} onChange={setLevel} />
+            <ThinkingLevelMenu value={level} onChange={onLevelChange} />
 
             {/* mic → voice mode */}
             <button

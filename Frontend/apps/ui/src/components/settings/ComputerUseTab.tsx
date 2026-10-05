@@ -97,8 +97,8 @@ export interface ComputerUseProps {
 }
 
 /**
- * Computer Use settings. Session-only state lives in App; nothing is
- * persisted anywhere.
+ * Computer Use settings. State lives in App and is persisted to the
+ * backend DB when reachable.
  */
 export function ComputerUseTab({ value, onPatch }: ComputerUseProps) {
   const toggleApp = (id: string) =>
