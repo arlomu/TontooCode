@@ -49,23 +49,14 @@ function newId(): string {
     : `chat-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
-const DRAFTS_KEY = 'tontoo.drafts.v1';
-
-/** Unsent composer text per project (new-chat area). Survives reloads. */
-function loadDrafts(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const clean: Record<string, string> = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      if (typeof v === 'string' && v) clean[k] = v;
-    }
-    return clean;
-  } catch {
-    return {};
+/** Unsent composer text per project (new-chat area). Lives in the backend DB. */
+function cleanDrafts(parsed: unknown): Record<string, string> {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(parsed)) {
+    if (typeof v === 'string' && v) clean[k] = v;
   }
+  return clean;
 }
 
 /**
@@ -349,31 +340,23 @@ export default function App() {
   const [providers, setProviders] = useState<ProvidersState>({ providers: [], online: true });
 
   // Unsent composer drafts per project. State updates instantly while
-  // typing; localStorage is written 400ms after typing stops.
-  const [drafts, setDrafts] = useState<Record<string, string>>(() => loadDrafts());
-  const draftsRef = useRef(drafts);
-  draftsRef.current = drafts;
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(DRAFTS_KEY, JSON.stringify(draftsRef.current));
-      } catch {
-        /* storage unavailable */
-      }
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [drafts]);
-  // Flush a pending write when leaving the app within the debounce window.
-  useEffect(
-    () => () => {
-      try {
-        localStorage.setItem(DRAFTS_KEY, JSON.stringify(draftsRef.current));
-      } catch {
-        /* storage unavailable */
-      }
-    },
-    [],
-  );
+  // typing; the backend DB is written 400ms after typing stops.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Debounced write-through per project (silent when offline).
+  const pendingDrafts = useRef<Record<string, string>>({});
+  const draftTimer = useRef<number | null>(null);
+  const flushDrafts = useCallback(() => {
+    const body = pendingDrafts.current;
+    pendingDrafts.current = {};
+    draftTimer.current = null;
+    for (const [projectId, text] of Object.entries(body)) {
+      void backend.saveDraft(projectId, text).catch(() => {});
+    }
+  }, []);
+  const scheduleDraftFlush = useCallback(() => {
+    if (draftTimer.current !== null) window.clearTimeout(draftTimer.current);
+    draftTimer.current = window.setTimeout(() => flushDrafts(), 400);
+  }, [flushDrafts]);
 
   const updateDraft = useCallback((projectId: string, text: string) => {
     setDrafts((prev) => {
@@ -385,7 +368,10 @@ export default function App() {
       }
       return prev[projectId] === text ? prev : { ...prev, [projectId]: text };
     });
-  }, []);
+    // Empty text deletes the backend row; schedule either way.
+    pendingDrafts.current[projectId] = text;
+    scheduleDraftFlush();
+  }, [scheduleDraftFlush]);
 
   const clearDraft = useCallback((projectId: string) => {
     updateDraft(projectId, '');
@@ -559,6 +545,12 @@ export default function App() {
       } catch {
         /* backend offline — local PROJECTS fallback stands */
         if (!cancelled) setProjectsOnline(false);
+      }
+      try {
+        const storedDrafts = await backend.listDrafts();
+        if (!cancelled) setDrafts(cleanDrafts(storedDrafts));
+      } catch {
+        /* backend offline — drafts stay session-only */
       }
       try {
         const s = await backend.getSettings();

@@ -44,6 +44,11 @@ CREATE TABLE IF NOT EXISTS chats (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS drafts (
+    project_id TEXT PRIMARY KEY,
+    text TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -254,7 +259,6 @@ class Storage:
             return cur.rowcount > 0
 
     # ----- chats (stubs only: id + name, no messages) -----
-
     def create_chat(self, name: str, project_id: str = "") -> dict[str, Any]:
         now = utcnow()
         with self._lock:
@@ -276,3 +280,28 @@ class Storage:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
+
+    # ----- drafts (unsent composer text per project) -----
+
+    def get_drafts(self) -> dict[str, str]:
+        with self._lock:
+            rows = self._conn.execute("SELECT project_id, text FROM drafts").fetchall()
+        return {row["project_id"]: row["text"] for row in rows if row["text"]}
+
+    def set_draft(self, project_id: str, text: str) -> dict[str, str]:
+        """Upsert a draft; empty text deletes the row."""
+        with self._lock:
+            if text:
+                self._conn.execute(
+                    """INSERT INTO drafts (project_id, text, updated_at)
+                       VALUES (?, ?, ?)
+                       ON CONFLICT(project_id) DO UPDATE
+                       SET text = excluded.text, updated_at = excluded.updated_at""",
+                    (project_id, text, utcnow()),
+                )
+            else:
+                self._conn.execute(
+                    "DELETE FROM drafts WHERE project_id = ?", (project_id,)
+                )
+            self._conn.commit()
+        return {"project_id": project_id, "text": text if text else ""}

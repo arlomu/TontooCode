@@ -16,6 +16,8 @@ Endpoints (all JSON, all localhost-only):
   POST   /api/catalog/refresh
   POST   /api/chat/create
   POST   /api/agent
+  GET    /api/drafts
+  PUT    /api/drafts/{project_id}
 
 Only chat *stubs* (id + name) are stored — chat messages live in the
 frontend only. The agent streams plain text replies, no tool calls yet.
@@ -71,6 +73,10 @@ class AgentRequest(BaseModel):
     id: str = ""
     messages: list[Any] = Field(default_factory=list)
     model: str = ""
+
+
+class DraftUpdate(BaseModel):
+    text: str = Field(default="", max_length=20000)
 
 
 def _slugify(name: str) -> str:
@@ -185,6 +191,16 @@ def create_app(storage: Storage) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    # ----- drafts (unsent composer text per project) -----
+
+    @app.get("/api/drafts")
+    def list_drafts() -> dict[str, str]:
+        return storage.get_drafts()
+
+    @app.put("/api/drafts/{project_id}")
+    def put_draft(project_id: str, body: DraftUpdate) -> dict[str, str]:
+        return storage.set_draft(project_id, body.text)
 
     # ----- models.dev catalog (served from a 24h cache) -----
 

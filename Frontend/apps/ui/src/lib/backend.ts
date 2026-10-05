@@ -102,6 +102,12 @@ export const backend = {
       method: 'POST',
       body: JSON.stringify({ name, project_id }),
     }),
+  listDrafts: () => request<Record<string, string>>('/api/drafts'),
+  saveDraft: (project_id: string, text: string) =>
+    request<{ project_id: string; text: string }>(
+      `/api/drafts/${encodeURIComponent(project_id)}`,
+      { method: 'PUT', body: JSON.stringify({ text }) },
+    ),
   addProvider: (name: string, api_key: string, base_url = '') =>
     request<BackendProvider>('/api/providers', {
       method: 'POST',
