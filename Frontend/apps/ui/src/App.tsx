@@ -89,6 +89,7 @@ interface WorkspaceProps {
   onDraftChange: (text: string) => void;
   onBeforeSend: (id: string, text: string) => Promise<void>;
   onStatusChange: (id: string, status: ChatStatus) => void;
+  projectId: string;
   draftProject: string;
   onDraftProjectChange: (id: string) => void;
   onAddProject: (project: NewProject) => void;
@@ -111,12 +112,16 @@ function Workspace({
   onDraftChange,
   onBeforeSend,
   onStatusChange,
+  projectId,
   draftProject,
   onDraftProjectChange,
   onAddProject,
   projects,
 }: WorkspaceProps) {
-  const transport = useMemo(() => createTransport({ model }), [model]);
+  const transport = useMemo(
+    () => createTransport({ model, projectId }),
+    [model, projectId],
+  );
   const { messages, status, error, sendMessage, stop, regenerate } = useChat<TontooMessage>({
     id: conversationId,
     messages: initialMessages,
@@ -749,7 +754,8 @@ export default function App() {
 
   const persist = useCallback(
     (id: string, messages: TontooMessage[]) => {
-      const conv = summarize(id, messages, projectOf(id));
+      const prevTitle = metasRef.current.find((m) => m.id === id)?.title;
+      const conv = summarize(id, messages, projectOf(id), prevTitle);
       // Finished in the background → yellow until opened.
       if (id !== activeIdRef.current) {
         setFinishedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -781,6 +787,34 @@ export default function App() {
     const freshId = newId();
     pendingRef.current[projectId] = freshId;
     setActiveId(freshId);
+  }, []);
+
+  const deleteChat = useCallback((id: string) => {
+    clearDraft(id);
+    setStreamingIds((prev) => prev.filter((x) => x !== id));
+    setFinishedIds((prev) => prev.filter((x) => x !== id));
+    delete initialsRef.current[id];
+    for (const pid of Object.keys(pendingRef.current)) {
+      if (pendingRef.current[pid] === id) delete pendingRef.current[pid];
+    }
+    void deleteConversation(id).then(() => {
+      setMetas((prev) => prev.filter((m) => m.id !== id));
+      if (id === activeIdRef.current) handleNew();
+    });
+  }, [clearDraft, handleNew]);
+
+  const renameConversation = useCallback(async (id: string, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setMetas((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, title: trimmed } : m)),
+    );
+    try {
+      const full = await loadConversation(id);
+      if (full) await saveConversation({ ...full, title: trimmed });
+    } catch {
+      /* session-only entry — meta update above stands */
+    }
   }, []);
 
   // Backend chat stubs, created lazily on first send (title = prompt head).
@@ -910,6 +944,12 @@ export default function App() {
     return ids;
   }, [activeId, streamingIds]);
 
+  // Project context per conversation for the agent request body.
+  const projectFor = (id: string): string =>
+    metas.find((m) => m.id === id)?.projectId ??
+    Object.keys(pendingRef.current).find((pid) => pendingRef.current[pid] === id) ??
+    draftProject;
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -934,19 +974,8 @@ return (
           onShowMore={showMore}
           onSelect={(id) => void handleSelect(id)}
           onNew={handleNew}
-          onDelete={(id) => {
-            clearDraft(id);
-            setStreamingIds((prev) => prev.filter((x) => x !== id));
-            setFinishedIds((prev) => prev.filter((x) => x !== id));
-            delete initialsRef.current[id];
-            for (const pid of Object.keys(pendingRef.current)) {
-              if (pendingRef.current[pid] === id) delete pendingRef.current[pid];
-            }
-            void deleteConversation(id).then(() => {
-              setMetas((prev) => prev.filter((m) => m.id !== id));
-              if (id === activeId) handleNew();
-            });
-          }}
+          onDelete={deleteChat}
+          onRenameChat={renameConversation}
           onOpenSettings={() => setView('settings')}
           onRenameProject={renameProject}
           onDeleteProject={deleteProject}
@@ -967,6 +996,8 @@ return (
           liveIds={streamingIds}
           doneIds={finishedIds}
           onSelect={(id) => void handleSelect(id)}
+          onDeleteChat={deleteChat}
+          onRenameChat={renameConversation}
         />
         <div className="flex min-h-0 flex-1">
           {view === 'chat' ? (
@@ -989,6 +1020,7 @@ return (
                   onDraftChange={(text) => updateDraft(id, text)}
                   onBeforeSend={handleBeforeSend}
                   onStatusChange={onStatusChange}
+                  projectId={projectFor(id)}
                   draftProject={draftProject}
                   onDraftProjectChange={setDraftProject}
                   onAddProject={addProject}

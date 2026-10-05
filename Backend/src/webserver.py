@@ -16,6 +16,7 @@ Endpoints (all JSON, all localhost-only):
   POST   /api/catalog/refresh
   POST   /api/chat/create
   POST   /api/agent
+  GET    /api/systemprompt
   GET    /api/drafts
   PUT    /api/drafts/{project_id}
 
@@ -38,6 +39,7 @@ from settings import SettingsError, SettingsService
 from storage import Storage
 import agent.main as agent_main
 from agent import storage as agent_storage
+from agent import systemprompt as agent_prompts
 from agent.provider import AgentError
 import modelsdev
 
@@ -73,6 +75,7 @@ class AgentRequest(BaseModel):
     id: str = ""
     messages: list[Any] = Field(default_factory=list)
     model: str = ""
+    project_id: str = ""
 
 
 class DraftUpdate(BaseModel):
@@ -184,7 +187,11 @@ def create_app(storage: Storage) -> FastAPI:
     def run_agent(body: AgentRequest) -> StreamingResponse:
         try:
             agent, prompt, history = agent_main.prepare_run(
-                storage, body.model.strip(), body.messages
+                storage,
+                body.model.strip(),
+                body.messages,
+                chat_id=body.id,
+                project_id=body.project_id.strip(),
             )
         except AgentError as exc:
             raise HTTPException(status_code=exc.status, detail=str(exc.detail)) from exc
@@ -193,6 +200,21 @@ def create_app(storage: Storage) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @app.get("/api/systemprompt")
+    def system_prompt(
+        model: str = "", chat_id: str = "", project_id: str = ""
+    ) -> dict[str, Any]:
+        """Debug view of the composed system prompt (placeholders resolved)."""
+        text = agent_prompts.compose(
+            storage, model=model, chat_id=chat_id, project_id=project_id
+        )
+        directory = agent_prompts.prompts_dir()
+        return {
+            "parts": [name for name, _ in agent_prompts.load_parts(directory)],
+            "prompt": text,
+            "approx_tokens": agent_prompts.token_hint(text),
+        }
 
     # ----- drafts (unsent composer text per project) -----
 

@@ -17,6 +17,7 @@ from storage import Storage
 
 from .provider import AgentError, build_model
 from .stream import iter_ui_chunks
+from .systemprompt import compose as compose_system_prompt
 
 
 def flatten_transcript(messages: list[Any]) -> list[dict[str, str]]:
@@ -68,16 +69,27 @@ def split_history(
 
 
 def prepare_run(
-    storage: Storage, model: str, messages: list[Any]
+    storage: Storage,
+    model: str,
+    messages: list[Any],
+    chat_id: str = "",
+    project_id: str = "",
 ) -> tuple[Agent, str, list[ModelMessage]]:
     """Build the agent, prompt and history eagerly (raises before streaming)."""
-    model_instance = build_model(storage, (model or "").strip())
+    model_name = (model or "").strip()
+    model_instance = build_model(storage, model_name)
     instructions, history, prompt = split_history(flatten_transcript(messages or []))
-    agent = (
-        Agent(model_instance, instructions=instructions)
-        if instructions
-        else Agent(model_instance)
+    repo_prompt = compose_system_prompt(
+        storage, model=model_name, chat_id=chat_id, project_id=project_id
     )
+    combined: str | None = None
+    if repo_prompt.strip() and instructions:
+        combined = repo_prompt + "\n\n" + instructions
+    elif repo_prompt.strip():
+        combined = repo_prompt
+    elif instructions:
+        combined = instructions
+    agent = Agent(model_instance, instructions=combined) if combined else Agent(model_instance)
     return agent, prompt, history
 
 
