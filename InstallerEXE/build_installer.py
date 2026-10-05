@@ -57,7 +57,7 @@ def _run(argv: list[str], cwd: Path) -> None:
         raise SystemExit(f"Failed ({result.returncode}): {' '.join(argv)}")
 
 
-def _pyinstaller(name: str, entry: Path, source_dir: Path, extra: list[str]) -> None:
+def _pyinstaller(name: str, entry: Path, out_dir: Path, source_dir: Path, extra: list[str]) -> None:
     _run(
         [
             sys.executable,
@@ -74,11 +74,11 @@ def _pyinstaller(name: str, entry: Path, source_dir: Path, extra: list[str]) -> 
             "--paths",
             str(source_dir),
             "--distpath",
-            str(source_dir.parent / "dist"),
+            str(out_dir / "dist"),
             "--workpath",
-            str(source_dir.parent / "build"),
+            str(out_dir / "build"),
             "--specpath",
-            str(source_dir.parent),
+            str(out_dir),
             *extra,
             str(entry),
         ],
@@ -91,10 +91,11 @@ def build_executables() -> None:
     _run(["pnpm", "install"], FRONTEND_DIR)
     _run(["pnpm", "build"], FRONTEND_DIR)
     _run(["pnpm", "build"], DESKTOP_DIR)
-    _pyinstaller("backend", BACKEND_DIR / "src" / "main.py", BACKEND_DIR / "src", [])
+    _pyinstaller("backend", BACKEND_DIR / "src" / "main.py", BACKEND_DIR, BACKEND_DIR / "src", [])
     _pyinstaller(
         "TontooCode",
         STARTER_DIR / "main.py",
+        STARTER_DIR,
         STARTER_DIR,
         [
             "--add-data",
@@ -140,7 +141,7 @@ def freeze_installer() -> None:
             "--icon",
             str(HERE / "assets" / "icon.png"),
             "--add-data",
-            f"{PAYLOAD_ZIP};.",
+            f"{PAYLOAD_ZIP};{PAYLOAD_DIR.name}",
             "--hidden-import",
             "PIL.Image",
             "--distpath",
@@ -157,8 +158,11 @@ def freeze_installer() -> None:
 
 
 def main() -> int:
-    build_executables()
-    build_payload()
+    """Build everything. Pass `--freeze-only` to reuse an existing payload."""
+    freeze_only = "--freeze-only" in sys.argv[1:]
+    if not freeze_only:
+        build_executables()
+        build_payload()
     freeze_installer()
     print(f"\nInstaller ready: {DIST_DIR / (INSTALLER_NAME + '.exe')}")
     return 0

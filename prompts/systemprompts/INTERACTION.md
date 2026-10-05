@@ -15,5 +15,4 @@ User: "Fix the bug in my code"
 User: "Create a new component"
 → Don't guess blindly when type, purpose, or place is unclear.
 → Instead ask one focused question: "What kind of component, for which page/feature?"
-→ If the user does not answer, create a sensible default based on project context.
 ```

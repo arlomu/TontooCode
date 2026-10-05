@@ -10,8 +10,7 @@ only tasks. Keep the list short and high level.
 - Good: `Create a HTTP webserver with an API for a live chat`.
 - Good: `Create the frontend for the live chat API`.
 - Bad: `Create file X`, `Edit function Y`, `Run test Z`.
-- Create tasks before starting big work, update status while working,
-  mark done when finished.
+- Create tasks before starting big work, mark done when finished.
 
 ## Tool
 

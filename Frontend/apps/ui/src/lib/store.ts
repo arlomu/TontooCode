@@ -94,7 +94,12 @@ export async function deleteConversation(id: string): Promise<void> {
 }
 
 /** Derives list-view metadata from a full message list. */
-export function summarize(id: string, messages: TontooMessage[], projectId: string): Conversation {
+export function summarize(
+  id: string,
+  messages: TontooMessage[],
+  projectId: string,
+  keepTitle?: string,
+): Conversation {
   const firstUser = messages.find((m) => m.role === 'user');
   const firstText =
     firstUser?.parts
@@ -106,9 +111,11 @@ export function summarize(id: string, messages: TontooMessage[], projectId: stri
     (n, m) => n + (m.parts?.filter((p) => isToolUIPart(p)).length ?? 0),
     0,
   );
+  const derived = firstText ? firstText.slice(0, 48) + (firstText.length > 48 ? '…' : '') : 'New chat';
   return {
     id,
-    title: firstText ? firstText.slice(0, 48) + (firstText.length > 48 ? '…' : '') : 'New chat',
+    // A custom title (prompt head or rename) survives later finishes.
+    title: keepTitle && keepTitle.trim() ? keepTitle : derived,
     updatedAt: Date.now(),
     messageCount: messages.length,
     toolCount,

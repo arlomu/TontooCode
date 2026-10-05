@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { ConversationMeta } from '@/lib/store';
 import { LiveBubble } from '@/components/LiveBubble';
+import { ChatContextMenu } from '@/components/ChatContextMenu';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { RenameProjectDialog } from '@/components/RenameProjectDialog';
 
 /** Mirrors TITLEBAR_HEIGHT in apps/desktop/src/main.js */
 export const TITLEBAR_HEIGHT = 38;
@@ -19,6 +23,8 @@ interface TitleBarProps {
   /** Conversations whose agent finished while in the background (unread). */
   doneIds: string[];
   onSelect: (id: string) => void;
+  onDeleteChat: (id: string) => void;
+  onRenameChat: (id: string, title: string) => void;
 }
 
 /**
@@ -27,9 +33,14 @@ interface TitleBarProps {
  * A drag region that carries the newest chats as tabs on the right, just
  * left of the native caption buttons Electron overlays via titleBarOverlay.
  */
-export function TitleBar({ recent, activeId, liveIds, doneIds, onSelect }: TitleBarProps) {
+export function TitleBar({ recent, activeId, liveIds, doneIds, onSelect, onDeleteChat, onRenameChat }: TitleBarProps) {
   const platform = window.tontoo?.platform;
   const caption = platform === 'darwin' ? CAPTION_W.darwin : CAPTION_W.win32;
+  const [tabMenu, setTabMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [tabRenameId, setTabRenameId] = useState<string | null>(null);
+  const [tabDeleteId, setTabDeleteId] = useState<string | null>(null);
+  const tabTargetId = tabMenu?.id ?? tabRenameId ?? tabDeleteId ?? null;
+  const tabTarget = tabTargetId !== null ? recent.find((c) => c.id === tabTargetId) : undefined;
 
   return (
     <header
@@ -51,6 +62,10 @@ export function TitleBar({ recent, activeId, liveIds, doneIds, onSelect }: Title
                 <button
                   type="button"
                   onClick={() => onSelect(c.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setTabMenu({ id: c.id, x: e.clientX, y: e.clientY });
+                  }}
                   title={c.title}
                   aria-current={active ? 'true' : undefined}
                   className={cn(
@@ -77,6 +92,51 @@ export function TitleBar({ recent, activeId, liveIds, doneIds, onSelect }: Title
 
       {/* room for the native caption buttons */}
       <div aria-hidden className="shrink-0 self-center" style={{ width: caption }} />
+
+      {/* tab right-click menu + dialogs (all custom, no native popups) */}
+      {tabMenu && tabTarget && (
+        <ChatContextMenu
+          x={tabMenu.x}
+          y={tabMenu.y}
+          onRename={() => {
+            setTabMenu(null);
+            setTabRenameId(tabTarget.id);
+          }}
+          onDelete={() => {
+            setTabMenu(null);
+            setTabDeleteId(tabTarget.id);
+          }}
+          onClose={() => setTabMenu(null)}
+        />
+      )}
+      {tabTarget && tabRenameId === tabTarget.id && (
+        <RenameProjectDialog
+          title="Rename chat"
+          currentName={tabTarget.title}
+          onRename={(title) => {
+            setTabRenameId(null);
+            onRenameChat(tabTarget.id, title);
+          }}
+          onClose={() => setTabRenameId(null)}
+        />
+      )}
+      {tabTarget && tabDeleteId === tabTarget.id && (
+        <ConfirmDialog
+          title="Delete chat"
+          message={
+            <>
+              Delete <span className="font-semibold text-tt-ink">{tabTarget.title}</span>?
+              This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          onConfirm={() => {
+            setTabDeleteId(null);
+            onDeleteChat(tabTarget.id);
+          }}
+          onClose={() => setTabDeleteId(null)}
+        />
+      )}
     </header>
   );
 }

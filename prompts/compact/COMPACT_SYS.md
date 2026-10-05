@@ -10,7 +10,7 @@ You lose details on purpose, but never lose work state.
 - Preserve file paths, tool results, error messages, and IDs exactly.
 - Preserve current tasks with `id`, `title`, and `status`.
 - Preserve user preferences and project scope when set.
-- Max 2000 words. Dense bullet lists beat long prose.
+- Max 5000 words. Dense bullet lists beat long prose.
 - Never invent content. Mark unknowns as unknown.
 
 ## Output Sections

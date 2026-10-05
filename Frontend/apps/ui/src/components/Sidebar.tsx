@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronRight, Folder, Pencil, Settings, Trash2 } from 'lucide-react';
+import { ChevronRight, Folder, Pencil, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_PROJECT_ID, type ConversationMeta } from '@/lib/store';
 import { ProjectContextMenu } from '@/components/ProjectContextMenu';
+import { ChatContextMenu } from '@/components/ChatContextMenu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RenameProjectDialog } from '@/components/RenameProjectDialog';
 import { EditSubfoldersDialog } from '@/components/EditSubfoldersDialog';
@@ -26,6 +27,7 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onRenameChat: (id: string, title: string) => void;
   onOpenSettings: () => void;
   onRenameProject: (id: string, name: string) => void;
   onDeleteProject: (id: string) => void;
@@ -45,6 +47,7 @@ export function Sidebar({
   onSelect,
   onNew,
   onDelete,
+  onRenameChat,
   onOpenSettings,
   onRenameProject,
   onDeleteProject,
@@ -55,11 +58,22 @@ export function Sidebar({
   const [renameId, setRenameId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [subfoldersId, setSubfoldersId] = useState<string | null>(null);
+  // Chat right-click menu + dialogs (chat lives in chatsByProject).
+  const [chatMenu, setChatMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [chatRenameId, setChatRenameId] = useState<string | null>(null);
+  const [chatDeleteId, setChatDeleteId] = useState<string | null>(null);
 
   const menuProject = menu ? projects.find((p) => p.id === menu.id) : undefined;
   const renameProject = renameId ? projects.find((p) => p.id === renameId) : undefined;
   const deleteProject = deleteId ? projects.find((p) => p.id === deleteId) : undefined;
   const subfoldersProject = subfoldersId ? projects.find((p) => p.id === subfoldersId) : undefined;
+  const chatTargetId = chatMenu?.id ?? chatRenameId ?? chatDeleteId ?? null;
+  const chatTarget =
+    chatTargetId !== null
+      ? Object.values(chatsByProject)
+          .flat()
+          .find((c) => c.id === chatTargetId)
+      : undefined;
 
   return (
     <aside className="flex h-full w-[268px] shrink-0 flex-col border-r border-tt-hairline bg-tt-panel">
@@ -148,13 +162,17 @@ export function Sidebar({
                       {visible.map((c) => {
                         const active = c.id === activeId;
                         return (
-                          <li key={c.id} className="group relative">
+                          <li key={c.id}>
                             <button
                               type="button"
                               onClick={() => onSelect(c.id)}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                setChatMenu({ id: c.id, x: e.clientX, y: e.clientY });
+                              }}
                               aria-current={active ? 'true' : undefined}
                               className={cn(
-                                'block w-full py-[7px] pr-8 pl-[42px] text-left transition-colors',
+                                'block w-full py-[7px] pr-4 pl-[42px] text-left transition-colors',
                                 active
                                   ? 'bg-tt-card font-medium text-tt-ink'
                                   : 'text-tt-ink-2 hover:bg-tt-card/60',
@@ -170,14 +188,6 @@ export function Sidebar({
                                   )
                                 )}
                               </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onDelete(c.id)}
-                              aria-label={`Delete ${c.title}`}
-                              className="absolute top-1/2 right-2 hidden -translate-y-1/2 rounded p-1 text-tt-ink-3 group-hover:block hover:bg-tt-err-soft hover:text-tt-err"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           </li>
                         );
@@ -270,6 +280,51 @@ export function Sidebar({
             onDeleteProject(deleteProject.id);
           }}
           onClose={() => setDeleteId(null)}
+        />
+      )}
+
+      {/* chat right-click menu + dialogs (all custom, no native popups) */}
+      {chatMenu && chatTarget && (
+        <ChatContextMenu
+          x={chatMenu.x}
+          y={chatMenu.y}
+          onRename={() => {
+            setChatMenu(null);
+            setChatRenameId(chatTarget.id);
+          }}
+          onDelete={() => {
+            setChatMenu(null);
+            setChatDeleteId(chatTarget.id);
+          }}
+          onClose={() => setChatMenu(null)}
+        />
+      )}
+      {chatTarget && chatRenameId === chatTarget.id && (
+        <RenameProjectDialog
+          title="Rename chat"
+          currentName={chatTarget.title}
+          onRename={(title) => {
+            setChatRenameId(null);
+            onRenameChat(chatTarget.id, title);
+          }}
+          onClose={() => setChatRenameId(null)}
+        />
+      )}
+      {chatTarget && chatDeleteId === chatTarget.id && (
+        <ConfirmDialog
+          title="Delete chat"
+          message={
+            <>
+              Delete <span className="font-semibold text-tt-ink">{chatTarget.title}</span>?
+              This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          onConfirm={() => {
+            setChatDeleteId(null);
+            onDelete(chatTarget.id);
+          }}
+          onClose={() => setChatDeleteId(null)}
         />
       )}
     </aside>

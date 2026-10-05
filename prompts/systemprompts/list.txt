@@ -1,0 +1,6 @@
+1: GENERAL.md
+2. INTERACTION.md
+3: TASK.md
+4: SUBAGENT.md
+5: SKILLS.md
+6: AGENTS.md

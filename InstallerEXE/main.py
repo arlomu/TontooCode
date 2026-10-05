@@ -88,6 +88,7 @@ class InstallerApp:
         self._close_button: Button | None = None
         self._summary: Label | None = None
         self._running = False
+        self._finished = False
 
         self.root = Tk()
         self.root.title("Tontoo Code Installer")
@@ -285,15 +286,19 @@ class InstallerApp:
         self._running = True
         self.confirm.destroy()
         self.progress.pack(fill="both", expand=True)
-        self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 
-        thread = threading.Thread(target=self._worker, daemon=True)
+        def emit(kind: str, index: int, text: str) -> None:
+            self._queue.put((kind, index, text))
+
+        thread = threading.Thread(target=self._worker, args=(emit,), daemon=True)
         thread.start()
         self.root.after(POLL_MS, self._drain)
 
-    def _worker(self) -> None:
+    def _worker(self, emit) -> None:
         try:
-            installer.run(self.statuses, self._queue.put)
+            installer.run(self.statuses, emit)
+        except Exception as error:  # noqa: BLE001 - reported in the log
+            self._queue.put(("failed", 0, str(error)))
         finally:
             self._queue.put(None)
 
@@ -332,6 +337,9 @@ class InstallerApp:
         self._log.configure(state="disabled")
 
     def _finish(self) -> None:
+        if self._finished:
+            return
+        self._finished = True
         failed = next((s for s in self.statuses if s.state == "failed"), None)
         if failed is None:
             if self._summary is not None:

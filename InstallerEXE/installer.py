@@ -18,6 +18,7 @@ from pathlib import Path
 from shortcut import install_shortcut
 
 INSTALL_DIR = Path.home() / ".tontcode" / "exe"
+PAYLOAD_SUBDIR = "payload"
 PAYLOAD_NAME = "payload.zip"
 EXECUTABLES = ("backend.exe", "frontend.exe", "TontooCode.exe")
 STARTER_EXE = "TontooCode.exe"
@@ -37,7 +38,7 @@ def resource_dir() -> Path:
 
 
 def payload_path() -> Path:
-    return resource_dir() / PAYLOAD_NAME
+    return resource_dir() / PAYLOAD_SUBDIR / PAYLOAD_NAME
 
 
 @dataclass

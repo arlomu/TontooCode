@@ -13,7 +13,7 @@ Check these files in the project root and use their content when found:
 - `CURSOR.md`
 
 If several files exist, all apply. On conflicts, `AGENTS.md` wins,
-then `CLAUDE.md`, then `GEMINI.md`, then `CURSOR.md`.
+then `CLAUDE.md`, then `CURSOR.md`, then `GEMINI.md`.
 
 ## Content
 

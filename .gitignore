@@ -21,7 +21,7 @@ out/
 release/
 electron-builder.yml
 *.asar
-
+QUEUE.md
 # Python backend (future)
 .venv/
 venv/
