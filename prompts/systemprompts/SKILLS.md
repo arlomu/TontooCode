@@ -17,8 +17,9 @@ Use the `skill` tool to work with skills:
 
 - `list`: show available skills with source and description.
 - `load`: load a skill by name before doing the task.
-- `create`: save a new user or project skill from a good workflow.
-- `delete`: remove a user or project skill.
+- `create`: save a new skill from a good workflow. Set `scope` to
+  `global` for user skills or `project` for project skills.
+- `delete`: remove a user (`global`) or project (`project`) skill.
 
 Never invent a skill workflow. If a task matches a skill, `load` it first.
 If no skill matches, work directly and `create` one only when the user asks.
