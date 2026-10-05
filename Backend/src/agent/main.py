@@ -1,19 +1,25 @@
-"""Agent entrypoint: turn a chat request into an SSE byte stream."""
+"""Agent entrypoint: turn a chat request into an SSE byte stream (pydantic-ai)."""
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
-from typing import Any, Iterator
+from typing import Any, AsyncIterator
+
+from pydantic_ai import Agent
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
 
 from storage import Storage
 
-from .provider import AgentError, resolve_provider
+from .provider import AgentError, build_model
 from .stream import iter_ui_chunks
 
 
-def to_openai_messages(messages: list[Any]) -> list[dict[str, str]]:
-    """Flatten UI messages (parts with text) into OpenAI chat messages."""
+def flatten_transcript(messages: list[Any]) -> list[dict[str, str]]:
+    """Flatten UI messages (parts with text) into plain role/content turns."""
     out: list[dict[str, str]] = []
     for message in messages:
         if not isinstance(message, dict):
@@ -39,46 +45,52 @@ def to_openai_messages(messages: list[Any]) -> list[dict[str, str]]:
     return out
 
 
-def open_completion_stream(
-    api: str, api_key: str, model: str, messages: list[dict[str, str]]
-):
-    """POST to the upstream chat-completions endpoint, return the open response."""
-    body = json.dumps({"model": model, "messages": messages, "stream": True}).encode(
-        "utf-8"
+def split_history(
+    transcript: list[dict[str, str]],
+) -> tuple[str | None, list[ModelMessage], str]:
+    """Split a transcript into system instructions, history and the prompt."""
+    instructions = (
+        "\n\n".join(t["content"] for t in transcript if t["role"] == "system") or None
     )
-    req = urllib.request.Request(
-        api + "/chat/completions",
-        data=body,
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-    )
-    try:
-        return urllib.request.urlopen(req, timeout=120)
-    except urllib.error.HTTPError as exc:
-        detail = f"provider request failed (HTTP {exc.code})"
-        if exc.code == 401:
-            detail = "provider rejected the API key (HTTP 401) — check it in Settings > Providers"
-        elif exc.code == 404:
-            detail = f"provider has no such model (HTTP 404) — '{model}'"
-        raise AgentError(502, detail) from exc
-    except Exception as exc:
-        raise AgentError(502, f"provider unreachable: {exc}") from exc
-
-
-def handle_run(storage: Storage, model: str, messages: list[Any]) -> Iterator[bytes]:
-    """Resolve, call upstream eagerly, and return the UI-stream iterator.
-
-    The upstream response is opened eagerly so HTTP errors surface before
-    the route commits to a 200 SSE stream.
-    """
-    provider, api, short_model = resolve_provider(storage, (model or "").strip())
-    openai_messages = to_openai_messages(messages or [])
-    if not openai_messages:
+    convo = [t for t in transcript if t["role"] in ("user", "assistant")]
+    user_idx = [i for i, t in enumerate(convo) if t["role"] == "user"]
+    if not user_idx:
         raise AgentError(400, "no message text to send")
-    upstream = open_completion_stream(
-        api, provider["api_key"], short_model, openai_messages
+    prompt = convo[user_idx[-1]]["content"]
+    history: list[ModelMessage] = []
+    for turn in convo[: user_idx[-1]]:
+        if turn["role"] == "user":
+            history.append(ModelRequest(parts=[UserPromptPart(content=turn["content"])]))
+        else:
+            history.append(ModelResponse(parts=[TextPart(content=turn["content"])]))
+    return instructions, history, prompt
+
+
+def prepare_run(
+    storage: Storage, model: str, messages: list[Any]
+) -> tuple[Agent, str, list[ModelMessage]]:
+    """Build the agent, prompt and history eagerly (raises before streaming)."""
+    model_instance = build_model(storage, (model or "").strip())
+    instructions, history, prompt = split_history(flatten_transcript(messages or []))
+    agent = (
+        Agent(model_instance, instructions=instructions)
+        if instructions
+        else Agent(model_instance)
     )
-    return iter_ui_chunks(upstream)
+    return agent, prompt, history
+
+
+async def _deltas(
+    agent: Agent, prompt: str, history: list[ModelMessage]
+) -> AsyncIterator[str]:
+    async with agent.run_stream(prompt, message_history=history) as result:
+        async for text in result.stream_text(delta=True):
+            yield text
+
+
+async def stream_run(
+    agent: Agent, prompt: str, history: list[ModelMessage]
+) -> AsyncIterator[bytes]:
+    """Stream the agent reply as UI-message SSE chunks."""
+    async for chunk in iter_ui_chunks(_deltas(agent, prompt, history)):
+        yield chunk

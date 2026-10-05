@@ -1,14 +1,16 @@
 """Agent package: provider resolution, streaming, persistence."""
-from .main import handle_run
-from .provider import AgentError, resolve_provider
+from .main import prepare_run, stream_run
+from .provider import AgentError, build_model
 from .storage import build_title, create_chat
-from .stream import iter_ui_chunks
+from .stream import error_chunk, iter_ui_chunks
 
 __all__ = [
     "AgentError",
+    "build_model",
     "build_title",
     "create_chat",
-    "handle_run",
+    "error_chunk",
     "iter_ui_chunks",
-    "resolve_provider",
+    "prepare_run",
+    "stream_run",
 ]

@@ -183,11 +183,13 @@ def create_app(storage: Storage) -> FastAPI:
     @app.post("/api/agent")
     def run_agent(body: AgentRequest) -> StreamingResponse:
         try:
-            sse = agent_main.handle_run(storage, body.model.strip(), body.messages)
+            agent, prompt, history = agent_main.prepare_run(
+                storage, body.model.strip(), body.messages
+            )
         except AgentError as exc:
             raise HTTPException(status_code=exc.status, detail=str(exc.detail)) from exc
         return StreamingResponse(
-            sse,
+            agent_main.stream_run(agent, prompt, history),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
