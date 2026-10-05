@@ -400,6 +400,50 @@ export default function App() {
       });
   }, []);
 
+  const renameProject = useCallback((id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setAllProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)));
+    void backend
+      .updateProject(id, { name: trimmed })
+      .then((updated) => {
+        setProjectsOnline(true);
+        setAllProjects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, name: updated.name } : p)),
+        );
+      })
+      .catch(() => setProjectsOnline(false));
+  }, []);
+
+  const deleteProject = useCallback((id: string) => {
+    if (id === DEFAULT_PROJECT_ID) return;
+    setAllProjects((prev) => prev.filter((p) => p.id !== id));
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (lastProject.current === id) lastProject.current = DEFAULT_PROJECT_ID;
+    if (draftProjectRef.current === id) setDraftProject(DEFAULT_PROJECT_ID);
+    void backend
+      .deleteProject(id)
+      .then(() => setProjectsOnline(true))
+      .catch(() => setProjectsOnline(false));
+  }, []);
+
+  const saveSubfolders = useCallback((id: string, subfolders: string[]) => {
+    setAllProjects((prev) => prev.map((p) => (p.id === id ? { ...p, subfolders } : p)));
+    void backend
+      .updateProject(id, { subfolders })
+      .then((updated) => {
+        setProjectsOnline(true);
+        setAllProjects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, subfolders: updated.subfolders } : p)),
+        );
+      })
+      .catch(() => setProjectsOnline(false));
+  }, []);
+
   // (The design/preset effects above own data-theme; nothing is persisted.)
 
   // Boot: list chats, open the most recent one (or a fresh chat),
@@ -704,6 +748,9 @@ return (
             });
           }}
           onOpenSettings={() => setView('settings')}
+          onRenameProject={renameProject}
+          onDeleteProject={deleteProject}
+          onEditSubfolders={saveSubfolders}
         />
       ) : (
         <SettingsNav

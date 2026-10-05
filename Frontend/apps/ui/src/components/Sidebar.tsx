@@ -1,12 +1,17 @@
+import { useState } from 'react';
 import { ChevronRight, Folder, Pencil, Settings, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ConversationMeta } from '@/lib/store';
+import { DEFAULT_PROJECT_ID, type ConversationMeta } from '@/lib/store';
+import { ProjectContextMenu } from '@/components/ProjectContextMenu';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { RenameProjectDialog } from '@/components/RenameProjectDialog';
+import { EditSubfoldersDialog } from '@/components/EditSubfoldersDialog';
 
 export const PAGE_SIZE = 10;
 export const PAGE_STEP = 15;
 
 interface SidebarProps {
-  projects: { id: string; name: string }[];
+  projects: { id: string; name: string; subfolders?: string[] }[];
   chatsByProject: Record<string, ConversationMeta[]>;
   activeId: string;
   expandedIds: Set<string>;
@@ -17,6 +22,9 @@ interface SidebarProps {
   onNew: () => void;
   onDelete: (id: string) => void;
   onOpenSettings: () => void;
+  onRenameProject: (id: string, name: string) => void;
+  onDeleteProject: (id: string) => void;
+  onEditSubfolders: (id: string, subfolders: string[]) => void;
 }
 
 export function Sidebar({
@@ -31,7 +39,21 @@ export function Sidebar({
   onNew,
   onDelete,
   onOpenSettings,
+  onRenameProject,
+  onDeleteProject,
+  onEditSubfolders,
 }: SidebarProps) {
+  // Right-click menu anchor + open dialogs (ids into `projects`).
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [subfoldersId, setSubfoldersId] = useState<string | null>(null);
+
+  const menuProject = menu ? projects.find((p) => p.id === menu.id) : undefined;
+  const renameProject = renameId ? projects.find((p) => p.id === renameId) : undefined;
+  const deleteProject = deleteId ? projects.find((p) => p.id === deleteId) : undefined;
+  const subfoldersProject = subfoldersId ? projects.find((p) => p.id === subfoldersId) : undefined;
+
   return (
     <aside className="flex h-full w-[268px] shrink-0 flex-col border-r border-tt-hairline bg-tt-panel">
       {/* wordmark — also the window drag handle for the top-left corner */}
@@ -76,6 +98,10 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => onToggleProject(p.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({ id: p.id, x: e.clientX, y: e.clientY });
+                }}
                 aria-expanded={open}
                 className="flex w-full items-center gap-1.5 px-4 py-[7px] text-left transition-colors hover:bg-tt-card/60"
               >
@@ -162,6 +188,66 @@ export function Sidebar({
           Settings
         </button>
       </div>
+
+      {/* right-click menu + dialogs (all custom, no native popups) */}
+      {menu && menuProject && (
+        <ProjectContextMenu
+          x={menu.x}
+          y={menu.y}
+          canDelete={menuProject.id !== DEFAULT_PROJECT_ID}
+          onRename={() => {
+            setMenu(null);
+            setRenameId(menuProject.id);
+          }}
+          onEditSubfolders={() => {
+            setMenu(null);
+            setSubfoldersId(menuProject.id);
+          }}
+          onDelete={() => {
+            setMenu(null);
+            setDeleteId(menuProject.id);
+          }}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      {renameProject && (
+        <RenameProjectDialog
+          currentName={renameProject.name}
+          onRename={(name) => {
+            setRenameId(null);
+            onRenameProject(renameProject.id, name);
+          }}
+          onClose={() => setRenameId(null)}
+        />
+      )}
+      {subfoldersProject && (
+        <EditSubfoldersDialog
+          projectName={subfoldersProject.name}
+          subfolders={subfoldersProject.subfolders ?? []}
+          onSave={(subs) => {
+            setSubfoldersId(null);
+            onEditSubfolders(subfoldersProject.id, subs);
+          }}
+          onClose={() => setSubfoldersId(null)}
+        />
+      )}
+      {deleteProject && (
+        <ConfirmDialog
+          title="Delete project"
+          message={
+            <>
+              Delete <span className="font-semibold text-tt-ink">{deleteProject.name}</span>?
+              Its chats stay and move to the Default project.
+            </>
+          }
+          confirmLabel="Delete"
+          onConfirm={() => {
+            setDeleteId(null);
+            onDeleteProject(deleteProject.id);
+          }}
+          onClose={() => setDeleteId(null)}
+        />
+      )}
     </aside>
   );
 }

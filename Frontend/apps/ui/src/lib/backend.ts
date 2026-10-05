@@ -78,6 +78,16 @@ export const backend = {
       method: 'POST',
       body: JSON.stringify({ name, main_folder, subfolders }),
     }),
+  updateProject: (
+    id: string,
+    patch: { name?: string; main_folder?: string; subfolders?: string[] },
+  ) =>
+    request<BackendProject>(`/api/projects/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteProject: (id: string) =>
+    request<void>(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   addProvider: (name: string, api_key: string) =>
     request<BackendProvider>('/api/providers', {
       method: 'POST',
