@@ -28,13 +28,14 @@ function AddDialog({
   onCreate,
   onClose,
 }: {
-  onCreate: (name: string, apiKey: string) => void;
+  onCreate: (name: string, apiKey: string, baseUrl: string) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [catalog, setCatalog] = useState<CatalogProvider[] | null>(null);
   const [selected, setSelected] = useState<CatalogProvider | null>(null);
   const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [failed, setFailed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -185,6 +186,23 @@ function AddDialog({
               Stored in the local backend database only, never sent anywhere else.
             </p>
           </div>
+          <div>
+            <p className="font-mono2 text-[10px] font-semibold tracking-[0.14em] text-tt-ink-3 uppercase">
+              Base URL <span className="normal-case tracking-normal">(optional)</span>
+            </p>
+            <input
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://api.example.com/v1"
+              aria-label="Base URL (optional)"
+              autoComplete="off"
+              spellCheck={false}
+              className="font-mono2 mt-1.5 w-full rounded-lg border border-tt-hairline bg-tt-card px-3 py-2 text-[13px] text-tt-ink outline-none placeholder:text-tt-ink-3 focus:border-tt-signal/50"
+            />
+            <p className="mt-1.5 text-[12px] leading-relaxed text-tt-ink-3">
+              Only needed when the backend does not know this provider&apos;s endpoint.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-tt-hairline px-5 py-3.5">
@@ -198,7 +216,7 @@ function AddDialog({
           <button
             type="button"
             disabled={!canCreate}
-            onClick={() => selected && onCreate(selected.name, apiKey)}
+            onClick={() => selected && onCreate(selected.name, apiKey, baseUrl.trim())}
             className={cn(
               'rounded-lg px-4 py-1.5 text-[13px] font-medium text-tt-ink-invert transition-all',
               canCreate ? 'bg-tt-ink hover:scale-[1.03]' : 'cursor-not-allowed bg-tt-ink-3/60',
@@ -235,12 +253,12 @@ export function ProvidersTab({ value, onChange }: ProvidersProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const create = async (name: string, apiKey: string) => {
+  const create = async (name: string, apiKey: string, baseUrl: string) => {
     setShowAdd(false);
     setError(null);
     if (value.online) {
       try {
-        const created = await backend.addProvider(name, apiKey);
+        const created = await backend.addProvider(name, apiKey, baseUrl);
         onChange({ providers: [...value.providers, created], online: true });
         return;
       } catch (err) {
@@ -253,7 +271,7 @@ export function ProvidersTab({ value, onChange }: ProvidersProps) {
     }
     // Offline fallback: session-only entry.
     onChange({
-      providers: [...value.providers, { id: newId(), name, has_key: apiKey.length > 0, created_at: '', updated_at: '' }],
+      providers: [...value.providers, { id: newId(), name, has_key: apiKey.length > 0, base_url: baseUrl, created_at: '', updated_at: '' }],
       online: false,
     });
   };
@@ -342,7 +360,7 @@ export function ProvidersTab({ value, onChange }: ProvidersProps) {
         )}
       </section>
 
-      {showAdd && <AddDialog onCreate={(n, k) => void create(n, k)} onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddDialog onCreate={(n, k, u) => void create(n, k, u)} onClose={() => setShowAdd(false)} />}
     </div>
   );
 }

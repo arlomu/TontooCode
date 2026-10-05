@@ -38,6 +38,7 @@ export interface BackendProvider {
   id: string;
   name: string;
   has_key: boolean;
+  base_url: string;
   created_at: string;
   updated_at: string;
 }
@@ -101,10 +102,10 @@ export const backend = {
       method: 'POST',
       body: JSON.stringify({ name, project_id }),
     }),
-  addProvider: (name: string, api_key: string) =>
+  addProvider: (name: string, api_key: string, base_url = '') =>
     request<BackendProvider>('/api/providers', {
       method: 'POST',
-      body: JSON.stringify({ name, api_key }),
+      body: JSON.stringify({ name, api_key, base_url }),
     }),
   deleteProvider: (id: string) =>
     request<void>(`/api/providers/${encodeURIComponent(id)}`, { method: 'DELETE' }),

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS providers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     api_key TEXT NOT NULL DEFAULT '',
+    base_url TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -66,16 +67,17 @@ class Storage:
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA foreign_keys=ON;")
         self._conn.executescript(SCHEMA)
-        # Backfill for databases created before chats.project_id existed.
-        try:
-            self._conn.execute(
-                "ALTER TABLE chats ADD COLUMN project_id TEXT NOT NULL DEFAULT ''"
-            )
-            self._conn.commit()
-        except sqlite3.OperationalError:
-            pass
+        # Backfill for databases created before these columns existed.
+        for column in (
+            "ALTER TABLE chats ADD COLUMN project_id TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE providers ADD COLUMN base_url TEXT NOT NULL DEFAULT ''",
+        ):
+            try:
+                self._conn.execute(column)
+                self._conn.commit()
+            except sqlite3.OperationalError:
+                pass
         self._lock = threading.Lock()
-
     def close(self) -> None:
         with self._lock:
             self._conn.close()
@@ -205,6 +207,7 @@ class Storage:
             "id": row["id"],
             "name": row["name"],
             "has_key": bool(row["api_key"]),
+            "base_url": row["base_url"] if "base_url" in row.keys() else "",
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
@@ -227,13 +230,15 @@ class Storage:
             ).fetchone()
         return self._row_to_provider(row, with_key=with_key) if row else None
 
-    def create_provider(self, provider_id: str, name: str, api_key: str = "") -> dict[str, Any]:
+    def create_provider(
+        self, provider_id: str, name: str, api_key: str = "", base_url: str = ""
+    ) -> dict[str, Any]:
         now = utcnow()
         with self._lock:
             self._conn.execute(
-                """INSERT INTO providers (id, name, api_key, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (provider_id, name, api_key, now, now),
+                """INSERT INTO providers (id, name, api_key, base_url, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)""",
+                (provider_id, name, api_key, base_url, now, now),
             )
             self._conn.commit()
         provider = self.get_provider(provider_id)
