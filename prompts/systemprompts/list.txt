@@ -2,5 +2,6 @@
 2. INTERACTION.md
 3: TASK.md
 4: SUBAGENT.md
-5: SKILLS.md
-6: AGENTS.md
+5: TOOLS.md
+6: SKILLS.md
+7: AGENTS.md

@@ -1,4 +1,4 @@
-# read 
+D # read 
 path* · offset: 0 · limit: 100 · encoding: utf8  
 → Returns file content
 
@@ -6,15 +6,15 @@ path* · offset: 0 · limit: 100 · encoding: utf8
 command* · work_dir: %PROJECTDIR%/ · timeout: 120 · env · description  
 → Runs a Powershell or Bash command
 
-# list
+D # list
 path: %PROJECTDIR%/ · recursive: false · include_hidden: false · max_depth: 0 · hide_folders: false  
 → Shows folders and files in a directory
 
-# grep  
+D # grep  
 pattern* · path: %PROJECTDIR%/ · glob: . · case_insensitive: false · max_matches: 150  
 → Returns matching lines with file path
 
-# glob  
+D # glob  
 pattern* · path: %PROJECTDIR%/ · max_results: 100  
 → Finds files by pattern
 
