@@ -41,6 +41,8 @@ DEFAULTS: dict[str, Any] = {
     # chat
     "chat.model": "opencode/space-bunny-free",
     "chat.thinking_level": "medium",
+    # ui (sidebar expanded state; paging limits stay session-only)
+    "ui.expanded_projects": [],
 }
 
 ALLOWED_KEYS = frozenset(DEFAULTS)

@@ -434,7 +434,9 @@ export default function App() {
     else style.removeProperty('--tt-ink');
   }, [presetId, colorOverrides]);
   // Projects start collapsed; per-project visible-chat limits for paging.
+  // Paging (show more) stays session-only; expanded state persists.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const expandedRef = useRef<Set<string>>(new Set());
   const [limits, setLimits] = useState<Record<string, number>>({});
   // Where the next chat lands: the project of the last opened chat.
   const lastProject = useRef(DEFAULT_PROJECT_ID);
@@ -464,6 +466,7 @@ export default function App() {
       lastProject.current = id;
       setDraftProject(id);
       setExpanded((prev) => new Set(prev).add(id));
+      expandedRef.current = new Set(expandedRef.current).add(id);
     };
     void backend
       .createProject(p.name, p.mainFolder, p.subfolders)
@@ -511,6 +514,7 @@ export default function App() {
       next.delete(id);
       return next;
     });
+    expandedRef.current = new Set([...expandedRef.current].filter((x) => x !== id));
     if (lastProject.current === id) lastProject.current = DEFAULT_PROJECT_ID;
     if (draftProjectRef.current === id) setDraftProject(DEFAULT_PROJECT_ID);
     void backend
@@ -714,6 +718,12 @@ export default function App() {
         if (storedModel !== undefined) setModel(storedModel);
         const storedLevel = oneOf(s['chat.thinking_level'], LEVELS);
         if (storedLevel !== undefined) setLevel(storedLevel);
+        const storedExpanded = strArr(s['ui.expanded_projects']);
+        if (storedExpanded !== undefined) {
+          const next = new Set(storedExpanded);
+          expandedRef.current = next;
+          setExpanded(next);
+        }
       } catch {
         /* backend offline — Light defaults stand */
       }
@@ -814,13 +824,13 @@ export default function App() {
   );
 
   const toggleProject = useCallback((projectId: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) next.delete(projectId);
-      else next.add(projectId);
-      return next;
-    });
-  }, []);
+    const next = new Set(expandedRef.current);
+    if (next.has(projectId)) next.delete(projectId);
+    else next.add(projectId);
+    expandedRef.current = next;
+    setExpanded(next);
+    persistSettings({ 'ui.expanded_projects': [...next] });
+  }, [persistSettings]);
 
   const showMore = useCallback((projectId: string) => {
     setLimits((prev) => ({
