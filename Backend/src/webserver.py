@@ -21,8 +21,8 @@ Endpoints (all JSON, all localhost-only):
   PUT    /api/drafts/{project_id}
 
 Only chat *stubs* (id + name) are stored — chat messages live in the
-frontend only. The agent streams plain text replies, no tool calls yet.
-Provider API keys are accepted and stored but never returned.
+frontend only. The agent streams text plus tool calls; tools execute in
+background threads. Provider API keys are accepted and stored but never returned.
 """
 from __future__ import annotations
 
@@ -181,12 +181,12 @@ def create_app(storage: Storage) -> FastAPI:
     def create_chat(body: ChatCreate) -> dict[str, Any]:
         return agent_storage.create_chat(storage, body.name.strip(), body.project_id.strip())
 
-    # ----- minimal streaming agent (no tools yet) -----
+    # ----- streaming agent (tools run in background threads) -----
 
     @app.post("/api/agent")
     def run_agent(body: AgentRequest) -> StreamingResponse:
         try:
-            agent, prompt, history = agent_main.prepare_run(
+            agent, prompt, history, status_queue = agent_main.prepare_run(
                 storage,
                 body.model.strip(),
                 body.messages,
@@ -196,7 +196,7 @@ def create_app(storage: Storage) -> FastAPI:
         except AgentError as exc:
             raise HTTPException(status_code=exc.status, detail=str(exc.detail)) from exc
         return StreamingResponse(
-            agent_main.stream_run(agent, prompt, history),
+            agent_main.stream_run(agent, prompt, history, status_queue),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )

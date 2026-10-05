@@ -40,6 +40,8 @@ export function describeToolCall(name: string, input: unknown): string {
   switch (name) {
     case 'read_file':
       return str(rec.path) || '…';
+    case 'list':
+      return `${str(rec.path) || 'project'}${rec.recursive ? ' · recursive' : ''}`;
     case 'grep':
       return `${str(rec.pattern) ? `“${str(rec.pattern)}”` : '…'}${str(rec.path) ? ` in ${str(rec.path)}` : ''}`;
     case 'run_terminal':
