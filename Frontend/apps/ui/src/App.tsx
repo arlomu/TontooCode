@@ -481,6 +481,7 @@ export default function App() {
 
   const deleteProject = useCallback((id: string) => {
     if (id === DEFAULT_PROJECT_ID) return;
+    clearDraft(id);
     setAllProjects((prev) => prev.filter((p) => p.id !== id));
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -493,7 +494,7 @@ export default function App() {
       .deleteProject(id)
       .then(() => setProjectsOnline(true))
       .catch(() => setProjectsOnline(false));
-  }, []);
+  }, [clearDraft]);
 
   const saveSubfolders = useCallback((id: string, subfolders: string[]) => {
     setAllProjects((prev) => prev.map((p) => (p.id === id ? { ...p, subfolders } : p)));
@@ -703,6 +704,14 @@ export default function App() {
     [],
   );
 
+  // Draft key mirrors what the composer displays: fresh (never sent) chats
+  // share one draft per project, existing chats have one per conversation.
+  const draftKeyFor = useCallback(
+    (id: string) =>
+      metasRef.current.some((m) => m.id === id) ? id : projectOf(id),
+    [projectOf],
+  );
+
   const persist = useCallback(
     (id: string, messages: TontooMessage[]) => {
       const conv = summarize(id, messages, projectOf(id));
@@ -751,10 +760,11 @@ export default function App() {
 
   const handleBeforeSend = useCallback(
     async (id: string, text: string) => {
-      clearDraft(projectOf(id));
+      // Clear exactly the draft the composer displays (see draftKey below).
+      clearDraft(draftKeyFor(id));
       await ensureBackendChat(id, text);
     },
-    [clearDraft, ensureBackendChat, projectOf],
+    [clearDraft, ensureBackendChat, draftKeyFor],
   );
 
   const toggleProject = useCallback((projectId: string) => {
@@ -828,10 +838,11 @@ export default function App() {
     );
   }
 
-  // Fresh (never sent) conversations show the project's unsent draft in the
-  // composer; existing chats always start with an empty box.
+  // Fresh (never sent) conversations share one draft per project;
+  // existing chats have one draft per conversation.
   const isFreshChat = !metas.some((m) => m.id === activeId);
-  const composerDraft = isFreshChat ? (drafts[draftProject] ?? '') : '';
+  const draftKey = isFreshChat ? draftProject : activeId;
+  const composerDraft = drafts[draftKey] ?? '';
 
 return (
     <div className="flex h-full">
@@ -848,6 +859,7 @@ return (
           onSelect={(id) => void handleSelect(id)}
           onNew={handleNew}
           onDelete={(id) => {
+            clearDraft(id);
             void deleteConversation(id).then(() => {
               setMetas((prev) => prev.filter((m) => m.id !== id));
               if (id === activeId) handleNew();
@@ -884,7 +896,7 @@ return (
               level={level}
               onLevelChange={handleLevelChange}
               draft={composerDraft}
-              onDraftChange={(text) => updateDraft(draftProjectRef.current, text)}
+              onDraftChange={(text) => updateDraft(draftKey, text)}
               onBeforeSend={handleBeforeSend}
               draftProject={draftProject}
               onDraftProjectChange={setDraftProject}
