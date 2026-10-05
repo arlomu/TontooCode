@@ -49,6 +49,25 @@ function newId(): string {
     : `chat-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
+const DRAFTS_KEY = 'tontoo.drafts.v1';
+
+/** Unsent composer text per project (new-chat area). Survives reloads. */
+function loadDrafts(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const clean: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === 'string' && v) clean[k] = v;
+    }
+    return clean;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Readable text color on top of an accent background (WCAG relative
  * luminance). Keeps icons legible on very light custom accents.
@@ -74,6 +93,9 @@ interface WorkspaceProps {
   onModelChange: (id: string) => void;
   level: ThinkingLevel;
   onLevelChange: (level: ThinkingLevel) => void;
+  draft: string;
+  onDraftChange: (text: string) => void;
+  onBeforeSend: (id: string, text: string) => Promise<void>;
   draftProject: string;
   onDraftProjectChange: (id: string) => void;
   onAddProject: (project: NewProject) => void;
@@ -92,12 +114,15 @@ function Workspace({
   onModelChange,
   level,
   onLevelChange,
+  draft,
+  onDraftChange,
+  onBeforeSend,
   draftProject,
   onDraftProjectChange,
   onAddProject,
   projects,
 }: WorkspaceProps) {
-  const transport = useMemo(() => createTransport(), []);
+  const transport = useMemo(() => createTransport({ model }), [model]);
   const { messages, status, error, sendMessage, stop, regenerate } = useChat<TontooMessage>({
     id: conversationId,
     messages: initialMessages,
@@ -107,9 +132,17 @@ function Workspace({
 
   const send = useCallback(
     (text: string) => {
-      void sendMessage({ text });
+      // Backend chat stub first, streaming reply second.
+      void (async () => {
+        try {
+          await onBeforeSend(conversationId, text);
+        } catch {
+          /* chat stub is best-effort — the message still goes out */
+        }
+        void sendMessage({ text });
+      })();
     },
-    [sendMessage],
+    [sendMessage, onBeforeSend, conversationId],
   );
 
   return (
@@ -147,6 +180,8 @@ function Workspace({
           onModelChange={onModelChange}
           level={level}
           onLevelChange={onLevelChange}
+          draft={draft}
+          onDraftChange={onDraftChange}
           onSend={send}
           onStop={stop}
         />
@@ -312,6 +347,49 @@ export default function App() {
 
   // Providers — backend-backed list with session fallback while offline.
   const [providers, setProviders] = useState<ProvidersState>({ providers: [], online: true });
+
+  // Unsent composer drafts per project. State updates instantly while
+  // typing; localStorage is written 400ms after typing stops.
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => loadDrafts());
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFTS_KEY, JSON.stringify(draftsRef.current));
+      } catch {
+        /* storage unavailable */
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [drafts]);
+  // Flush a pending write when leaving the app within the debounce window.
+  useEffect(
+    () => () => {
+      try {
+        localStorage.setItem(DRAFTS_KEY, JSON.stringify(draftsRef.current));
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    [],
+  );
+
+  const updateDraft = useCallback((projectId: string, text: string) => {
+    setDrafts((prev) => {
+      if (!text) {
+        if (!(projectId in prev)) return prev;
+        const next = { ...prev };
+        delete next[projectId];
+        return next;
+      }
+      return prev[projectId] === text ? prev : { ...prev, [projectId]: text };
+    });
+  }, []);
+
+  const clearDraft = useCallback((projectId: string) => {
+    updateDraft(projectId, '');
+  }, [updateDraft]);
 
   // Apply design + colors live to the document. RAM only.
   useEffect(() => {
@@ -649,12 +727,43 @@ export default function App() {
 
   const handleNew = useCallback(() => {
     // New chats land in the project of the last opened chat.
+    // Nothing is created via the API yet — that happens on first send.
     // Nothing auto-expands: the sidebar only moves on explicit clicks.
     newChatProject.current = lastProject.current;
     setDraftProject(lastProject.current);
     setActiveId(newId());
     setInitial([]);
   }, []);
+
+  // Backend chat stubs, created lazily on first send (title = prompt head).
+  const ensuredBackendChats = useRef<Set<string>>(new Set());
+  const ensureBackendChat = useCallback(
+    async (id: string, text: string) => {
+      if (ensuredBackendChats.current.has(id)) return;
+      if (metasRef.current.some((m) => m.id === id)) {
+        ensuredBackendChats.current.add(id);
+        return;
+      }
+      ensuredBackendChats.current.add(id);
+      try {
+        const title = text.slice(0, 20).trim() || 'New chat';
+        await backend.createChat(title, projectOf(id));
+      } catch {
+        // Offline — retry on the next send; the message still goes out.
+        ensuredBackendChats.current.delete(id);
+        throw new Error('backend unreachable');
+      }
+    },
+    [projectOf],
+  );
+
+  const handleBeforeSend = useCallback(
+    async (id: string, text: string) => {
+      clearDraft(projectOf(id));
+      await ensureBackendChat(id, text);
+    },
+    [clearDraft, ensureBackendChat, projectOf],
+  );
 
   const toggleProject = useCallback((projectId: string) => {
     setExpanded((prev) => {
@@ -727,6 +836,11 @@ export default function App() {
     );
   }
 
+  // Fresh (never sent) conversations show the project's unsent draft in the
+  // composer; existing chats always start with an empty box.
+  const isFreshChat = !metas.some((m) => m.id === activeId);
+  const composerDraft = isFreshChat ? (drafts[draftProject] ?? '') : '';
+
 return (
     <div className="flex h-full">
       {/* Left rail swaps between chat projects and settings nav. */}
@@ -777,6 +891,9 @@ return (
               onModelChange={handleModelChange}
               level={level}
               onLevelChange={handleLevelChange}
+              draft={composerDraft}
+              onDraftChange={(text) => updateDraft(draftProjectRef.current, text)}
+              onBeforeSend={handleBeforeSend}
               draftProject={draftProject}
               onDraftProjectChange={setDraftProject}
               onAddProject={addProject}

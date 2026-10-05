@@ -51,6 +51,14 @@ export interface BackendProject {
   updated_at: string;
 }
 
+export interface BackendChat {
+  id: number;
+  name: string;
+  project_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CatalogProvider {
   id: string;
   name: string;
@@ -88,6 +96,11 @@ export const backend = {
     }),
   deleteProject: (id: string) =>
     request<void>(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createChat: (name: string, project_id: string) =>
+    request<BackendChat>('/api/chat/create', {
+      method: 'POST',
+      body: JSON.stringify({ name, project_id }),
+    }),
   addProvider: (name: string, api_key: string) =>
     request<BackendProvider>('/api/providers', {
       method: 'POST',

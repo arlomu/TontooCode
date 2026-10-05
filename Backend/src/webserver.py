@@ -15,9 +15,11 @@ Endpoints (all JSON, all localhost-only):
   GET    /api/catalog/providers/{provider_id}
   POST   /api/catalog/refresh
   POST   /api/chat/create
+  POST   /api/agent
 
 Only chat *stubs* (id + name) are stored — chat messages live in the
-frontend only. Provider API keys are accepted and stored but never returned.
+frontend only. The agent streams plain text replies, no tool calls yet.
+Provider API keys are accepted and stored but never returned.
 """
 from __future__ import annotations
 
@@ -27,10 +29,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from settings import SettingsError, SettingsService
 from storage import Storage
+import agent as agent_engine
 import modelsdev
 
 # Local dev origins (Vite + Electron over HTTP). file:// has no origin
@@ -57,6 +61,13 @@ class ProviderCreate(BaseModel):
 
 class ChatCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    project_id: str = Field(default="", max_length=256)
+
+
+class AgentRequest(BaseModel):
+    id: str = ""
+    messages: list[Any] = Field(default_factory=list)
+    model: str = ""
 
 
 def _slugify(name: str) -> str:
@@ -156,7 +167,29 @@ def create_app(storage: Storage) -> FastAPI:
 
     @app.post("/api/chat/create", status_code=201)
     def create_chat(body: ChatCreate) -> dict[str, Any]:
-        return storage.create_chat(body.name.strip())
+        return storage.create_chat(body.name.strip(), body.project_id.strip())
+
+    # ----- minimal streaming agent (no tools yet) -----
+
+    @app.post("/api/agent")
+    def run_agent(body: AgentRequest) -> StreamingResponse:
+        try:
+            provider, api, short_model = agent_engine.resolve_provider(
+                storage, body.model.strip()
+            )
+            openai_messages = agent_engine.to_openai_messages(body.messages)
+            if not openai_messages:
+                raise agent_engine.AgentError(400, "no message text to send")
+            upstream = agent_engine.open_completion_stream(
+                api, provider["api_key"], short_model, openai_messages
+            )
+        except agent_engine.AgentError as exc:
+            raise HTTPException(status_code=exc.status, detail=str(exc.detail)) from exc
+        return StreamingResponse(
+            agent_engine.iter_ui_chunks(upstream),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     # ----- models.dev catalog (served from a 24h cache) -----
 

@@ -1,6 +1,5 @@
 import { DefaultChatTransport, type ChatTransport } from 'ai';
 import type { TontooMessage } from '@/types';
-import { MockChatTransport } from './mock/mockTransport';
 
 const STORAGE_KEY = 'tontoo:backend-url';
 
@@ -33,12 +32,14 @@ export function backendMode(): BackendMode {
 }
 
 /**
- * One-line switch between the in-process mock and the real Python backend.
- * Both speak the Vercel AI UI-message stream protocol, so the UI is
- * identical either way.
+ * Real backend transport: streams plain-text replies from POST /api/agent
+ * using the UI-message stream protocol. The active model rides along in
+ * the request body so the backend knows what to call.
  */
-export function createTransport(): ChatTransport<TontooMessage> {
-  const url = getBackendUrl();
-  if (url) return new DefaultChatTransport<TontooMessage>({ api: `${url}/api/chat` });
-  return new MockChatTransport();
+export function createTransport(opts?: { model?: string }): ChatTransport<TontooMessage> {
+  const url = getBackendUrl() ?? 'http://127.0.0.1:7027';
+  return new DefaultChatTransport<TontooMessage>({
+    api: `${url}/api/agent`,
+    body: opts?.model ? { model: opts.model } : undefined,
+  });
 }

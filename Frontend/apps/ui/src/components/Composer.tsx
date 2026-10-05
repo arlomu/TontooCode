@@ -19,12 +19,13 @@ interface ComposerProps {
   onModelChange: (id: string) => void;
   level: ThinkingLevel;
   onLevelChange: (level: ThinkingLevel) => void;
+  draft: string;
+  onDraftChange: (text: string) => void;
   onSend: (text: string) => void;
   onStop: () => void;
 }
 
-export function Composer({ status, model, onModelChange, level, onLevelChange, onSend, onStop }: ComposerProps) {
-  const [value, setValue] = useState('');
+export function Composer({ status, model, onModelChange, level, onLevelChange, draft, onDraftChange, onSend, onStop }: ComposerProps) {
   const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,7 +33,7 @@ export function Composer({ status, model, onModelChange, level, onLevelChange, o
   const noticeTimer = useRef<number | null>(null);
 
   const busy = status === 'streaming' || status === 'submitted';
-  const canSend = value.trim().length > 0 && !busy;
+  const canSend = draft.trim().length > 0 && !busy;
   const maxHeight = MAX_LINES * LINE_HEIGHT;
 
   // Auto-grow to MAX_LINES, then keep the box fixed and let it scroll.
@@ -45,7 +46,7 @@ export function Composer({ status, model, onModelChange, level, onLevelChange, o
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [maxHeight]);
 
-  useLayoutEffect(resize, [value, resize]);
+  useLayoutEffect(resize, [draft, resize]);
 
   useEffect(() => {
     window.addEventListener('resize', resize);
@@ -62,9 +63,8 @@ export function Composer({ status, model, onModelChange, level, onLevelChange, o
   };
 
   const send = () => {
-    const text = value.trim();
+    const text = draft.trim();
     if (!text || busy) return;
-    setValue('');
     onSend(text);
   };
 
@@ -73,18 +73,18 @@ export function Composer({ status, model, onModelChange, level, onLevelChange, o
     (text: string) => {
       const el = areaRef.current;
       if (!el) {
-        setValue((v) => (v ? `${v}\n${text}` : text));
+        onDraftChange(draft ? `${draft}\n${text}` : text);
         return;
       }
-      const start = el.selectionStart ?? value.length;
-      const end = el.selectionEnd ?? value.length;
-      setValue(value.slice(0, start) + text + value.slice(end));
+      const start = el.selectionStart ?? draft.length;
+      const end = el.selectionEnd ?? draft.length;
+      onDraftChange(draft.slice(0, start) + text + draft.slice(end));
       requestAnimationFrame(() => {
         el.focus();
         el.selectionStart = el.selectionEnd = start + text.length;
       });
     },
-    [value],
+    [draft, onDraftChange],
   );
 
   /**
@@ -129,8 +129,8 @@ export function Composer({ status, model, onModelChange, level, onLevelChange, o
             <textarea
           ref={areaRef}
           rows={1}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          value={draft}
+          onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
