@@ -25,3 +25,7 @@ This tool is for creating or overwriting a file with the given content.
 # apply_patch
 
 This tool is for editing multiple files at once from a unified diff, applied all-or-nothing.
+
+# task
+
+This tool is for tracking big work steps via create, list, done and cancel, max 5 active at a time.
