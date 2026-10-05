@@ -30,7 +30,17 @@ from storage import Storage
 
 from .provider import AgentError, build_model
 from .stream import _sse, error_chunk
-from .tools import TOOL_TIMEOUT, TOOLS_POOL, glob_files, grep_files, list_directory, read_file
+from .tools import (
+    TOOL_TIMEOUT,
+    TOOLS_POOL,
+    apply_patch as apply_patch_impl,
+    edit_file,
+    glob_files,
+    grep_files,
+    list_directory,
+    read_file,
+    write_file,
+)
 from .systemprompt import compose as compose_system_prompt
 
 
@@ -193,6 +203,40 @@ def build_agent(
             (project_dir, pattern, path, glob, case_insensitive, max_matches),
         )
 
+    @agent.tool_plain
+    async def edit(
+        path: str, old_string: str, new_string: str, replace_all: bool = False
+    ) -> str:
+        """Edit a single file by exact string replacement.
+
+        `path`, `old_string` and `new_string` are required. The match must
+        be unique unless `replace_all` is set.
+        """
+        return await _run_tool(
+            "edit",
+            edit_file,
+            (project_dir, path, old_string, new_string, replace_all),
+        )
+
+    @agent.tool_plain
+    async def write(path: str, content: str) -> str:
+        """Create or overwrite a file (parent folders are created as needed).
+
+        `path` and `content` are required.
+        """
+        return await _run_tool("write", write_file, (project_dir, path, content))
+
+    @agent.tool_plain
+    async def apply_patch(patch: str) -> str:
+        """Edit multiple files at once with a unified diff.
+
+        `patch` is required. Supports new files (--- /dev/null) and
+        deletions (+++ /dev/null); all hunks must match or nothing changes.
+        """
+        return await _run_tool(
+            "apply_patch", apply_patch_impl, (project_dir, patch)
+        )
+
     return agent
 
 
@@ -242,12 +286,16 @@ async def stream_run(
     # One automatic retry for transient provider failures (our tools are
     # read-only, so re-running is safe). Config errors never retry.
     for attempt in (1, 2):
-        text_id = f"t_{uuid4().hex[:8]}"
-        started = False
         try:
             async with agent.iter(prompt, message_history=history) as agent_run:
                 async for node in agent_run:
                     if agent.is_model_request_node(node):
+                        # Fresh text segment per model turn so the frontend
+                        # keeps chronological order: tools, text, tools, text.
+                        # Reusing one id would merge all text into the first
+                        # part and push every tool card to the bottom.
+                        segment_id = f"t_{uuid4().hex[:8]}"
+                        segment_started = False
                         async with node.stream(agent_run.ctx) as stream:
                             async for event in stream:
                                 if not (
@@ -258,16 +306,18 @@ async def stream_run(
                                 delta = event.delta.content_delta
                                 if not delta:
                                     continue
-                                if not started:
-                                    started = True
+                                if not segment_started:
+                                    segment_started = True
                                     if ttft < 0:
                                         ttft = time.monotonic() - start
-                                    yield _sse({"type": "text-start", "id": text_id})
+                                    yield _sse({"type": "text-start", "id": segment_id})
                                 chunks += 1
                                 chars += len(delta)
                                 yield _sse(
-                                    {"type": "text-delta", "id": text_id, "delta": delta}
+                                    {"type": "text-delta", "id": segment_id, "delta": delta}
                                 )
+                        if segment_started:
+                            yield _sse({"type": "text-end", "id": segment_id})
                     elif agent.is_call_tools_node(node):
                         async with node.stream(agent_run.ctx) as stream:
                             async for event in stream:
@@ -287,8 +337,6 @@ async def stream_run(
                 yield error_chunk(f"stream interrupted: {exc}")
                 return
             print(f"[tontoo/agent] transient provider error, retrying: {exc}")
-    if started:
-        yield _sse({"type": "text-end", "id": text_id})
     yield _sse({"type": "finish"})
     total = time.monotonic() - start
     print(
