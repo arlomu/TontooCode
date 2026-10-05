@@ -3,8 +3,8 @@
 Database location: ``~/.tontcode/db/settings.db`` (``Path.home()`` based,
 so it resolves to ``%USERPROFILE%`` on Windows and ``$HOME`` elsewhere).
 
-Only settings and projects live here. Chats are deliberately NOT stored
-yet — there is no chats table and no chat endpoint.
+Settings, projects and chat stubs live here. Chat *messages* are
+deliberately NOT stored yet — there is no messages table.
 """
 from __future__ import annotations
 
@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS providers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     api_key TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -232,3 +238,26 @@ class Storage:
             )
             self._conn.commit()
             return cur.rowcount > 0
+
+    # ----- chats (stubs only: id + name, no messages) -----
+
+    def create_chat(self, name: str) -> dict[str, Any]:
+        now = utcnow()
+        with self._lock:
+            cur = self._conn.execute(
+                """INSERT INTO chats (name, created_at, updated_at)
+                   VALUES (?, ?, ?)""",
+                (name, now, now),
+            )
+            self._conn.commit()
+            chat_id = cur.lastrowid
+            row = self._conn.execute(
+                "SELECT * FROM chats WHERE id = ?", (chat_id,)
+            ).fetchone()
+        assert row is not None
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }

@@ -14,9 +14,10 @@ Endpoints (all JSON, all localhost-only):
   GET    /api/catalog/providers
   GET    /api/catalog/providers/{provider_id}
   POST   /api/catalog/refresh
+  POST   /api/chat/create
 
-There are deliberately NO chat endpoints — chats are not stored anywhere
-yet. Provider API keys are accepted and stored but never returned.
+Only chat *stubs* (id + name) are stored — chat messages live in the
+frontend only. Provider API keys are accepted and stored but never returned.
 """
 from __future__ import annotations
 
@@ -52,6 +53,10 @@ class ProjectUpdate(BaseModel):
 class ProviderCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     api_key: str = Field(default="", max_length=4096)
+
+
+class ChatCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
 
 
 def _slugify(name: str) -> str:
@@ -146,6 +151,12 @@ def create_app(storage: Storage) -> FastAPI:
     def delete_provider(provider_id: str) -> None:
         if not storage.delete_provider(provider_id):
             raise HTTPException(status_code=404, detail="provider not found")
+
+    # ----- chats (stubs only; not wired into the frontend yet) -----
+
+    @app.post("/api/chat/create", status_code=201)
+    def create_chat(body: ChatCreate) -> dict[str, Any]:
+        return storage.create_chat(body.name.strip())
 
     # ----- models.dev catalog (served from a 24h cache) -----
 
