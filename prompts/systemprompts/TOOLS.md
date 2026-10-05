@@ -13,3 +13,15 @@ This tool is for searching file content with a regex and returning matches as pa
 # glob
 
 This tool is for finding files by pattern, supporting *, ?, [...] and **.
+
+# edit
+
+This tool is for editing a single file by exact string replacement (old_string to new_string).
+
+# write
+
+This tool is for creating or overwriting a file with the given content.
+
+# apply_patch
+
+This tool is for editing multiple files at once from a unified diff, applied all-or-nothing.
