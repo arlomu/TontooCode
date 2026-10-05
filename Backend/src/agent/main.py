@@ -234,52 +234,59 @@ async def stream_run(
     agent: Agent, prompt: str, history: list[ModelMessage]
 ) -> AsyncIterator[bytes]:
     """Stream the full agent run (text + tool calls) as UI-message chunks."""
-    text_id = f"t_{uuid4().hex[:8]}"
-    started = False
     chunks = 0
     chars = 0
     tools = 0
     start = time.monotonic()
     ttft = -1.0
-    try:
-        async with agent.iter(prompt, message_history=history) as agent_run:
-            async for node in agent_run:
-                if agent.is_model_request_node(node):
-                    async with node.stream(agent_run.ctx) as stream:
-                        async for event in stream:
-                            if not (
-                                isinstance(event, PartDeltaEvent)
-                                and isinstance(event.delta, TextPartDelta)
-                            ):
-                                continue
-                            delta = event.delta.content_delta
-                            if not delta:
-                                continue
-                            if not started:
-                                started = True
-                                ttft = time.monotonic() - start
-                                yield _sse({"type": "text-start", "id": text_id})
-                            chunks += 1
-                            chars += len(delta)
-                            yield _sse(
-                                {"type": "text-delta", "id": text_id, "delta": delta}
-                            )
-                elif agent.is_call_tools_node(node):
-                    async with node.stream(agent_run.ctx) as stream:
-                        async for event in stream:
-                            if isinstance(event, FunctionToolCallEvent):
-                                part = event.part
-                                yield _tool_input_chunk(
-                                    part.tool_call_id, part.tool_name, part.args
-                                )
-                            elif isinstance(event, FunctionToolResultEvent):
-                                if not isinstance(event.part, ToolReturnPart):
+    # One automatic retry for transient provider failures (our tools are
+    # read-only, so re-running is safe). Config errors never retry.
+    for attempt in (1, 2):
+        text_id = f"t_{uuid4().hex[:8]}"
+        started = False
+        try:
+            async with agent.iter(prompt, message_history=history) as agent_run:
+                async for node in agent_run:
+                    if agent.is_model_request_node(node):
+                        async with node.stream(agent_run.ctx) as stream:
+                            async for event in stream:
+                                if not (
+                                    isinstance(event, PartDeltaEvent)
+                                    and isinstance(event.delta, TextPartDelta)
+                                ):
                                     continue
-                                tools += 1
-                                yield _tool_result_chunk(event.tool_call_id, event)
-    except Exception as exc:
-        yield error_chunk(f"stream interrupted: {exc}")
-        return
+                                delta = event.delta.content_delta
+                                if not delta:
+                                    continue
+                                if not started:
+                                    started = True
+                                    if ttft < 0:
+                                        ttft = time.monotonic() - start
+                                    yield _sse({"type": "text-start", "id": text_id})
+                                chunks += 1
+                                chars += len(delta)
+                                yield _sse(
+                                    {"type": "text-delta", "id": text_id, "delta": delta}
+                                )
+                    elif agent.is_call_tools_node(node):
+                        async with node.stream(agent_run.ctx) as stream:
+                            async for event in stream:
+                                if isinstance(event, FunctionToolCallEvent):
+                                    part = event.part
+                                    yield _tool_input_chunk(
+                                        part.tool_call_id, part.tool_name, part.args
+                                    )
+                                elif isinstance(event, FunctionToolResultEvent):
+                                    if not isinstance(event.part, ToolReturnPart):
+                                        continue
+                                    tools += 1
+                                    yield _tool_result_chunk(event.tool_call_id, event)
+            break
+        except Exception as exc:
+            if attempt >= 2 or not _retryable(exc):
+                yield error_chunk(f"stream interrupted: {exc}")
+                return
+            print(f"[tontoo/agent] transient provider error, retrying: {exc}")
     if started:
         yield _sse({"type": "text-end", "id": text_id})
     yield _sse({"type": "finish"})
@@ -288,3 +295,24 @@ async def stream_run(
         f"[tontoo/agent] deltas={chunks} chars={chars} tools={tools} "
         f"ttft={ttft:.2f}s total={total:.2f}s"
     )
+
+
+#: Substrings marking transient provider failures worth one retry.
+_RETRYABLE = (
+    "empty response",
+    "429",
+    "502",
+    "503",
+    "529",
+    "overloaded",
+    "rate limit",
+    "temporarily",
+    "timeout",
+    "timed out",
+    "connection",
+)
+
+
+def _retryable(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return any(marker in message for marker in _RETRYABLE)
