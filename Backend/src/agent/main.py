@@ -1,6 +1,7 @@
 """Agent entrypoint: turn a chat request into an SSE byte stream (pydantic-ai)."""
 from __future__ import annotations
 
+import time
 from typing import Any, AsyncIterator
 
 from pydantic_ai import Agent
@@ -83,9 +84,25 @@ def prepare_run(
 async def _deltas(
     agent: Agent, prompt: str, history: list[ModelMessage]
 ) -> AsyncIterator[str]:
-    async with agent.run_stream(prompt, message_history=history) as result:
-        async for text in result.stream_text(delta=True):
-            yield text
+    # debounce_by=None: forward provider chunks untouched (no 100ms grouping).
+    start = time.monotonic()
+    chunks = 0
+    chars = 0
+    ttft = -1.0
+    try:
+        async with agent.run_stream(prompt, message_history=history) as result:
+            async for text in result.stream_text(delta=True, debounce_by=None):
+                if chunks == 0:
+                    ttft = time.monotonic() - start
+                chunks += 1
+                chars += len(text)
+                yield text
+    finally:
+        total = time.monotonic() - start
+        print(
+            f"[tontoo/agent] deltas={chunks} chars={chars} "
+            f"ttft={ttft:.2f}s total={total:.2f}s"
+        )
 
 
 async def stream_run(
