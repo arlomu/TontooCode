@@ -867,6 +867,15 @@ export default function App() {
     });
   }, [chatsByProject, allProjects]);
 
+  // Mounted conversations: active + any with a live stream. Stable keys keep
+  // running chats alive across switches; hidden ones render display:none.
+  // NOTE: must stay above the loading early-return (Rules of Hooks).
+  const mountedIds = useMemo(() => {
+    const ids = [activeId];
+    for (const id of streamingIds) if (id !== activeId) ids.push(id);
+    return ids;
+  }, [activeId, streamingIds]);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -874,14 +883,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Mounted conversations: active + any with a live stream. Stable keys keep
-  // running chats alive across switches; hidden ones render display:none.
-  const mountedIds = useMemo(() => {
-    const ids = [activeId];
-    for (const id of streamingIds) if (id !== activeId) ids.push(id);
-    return ids;
-  }, [activeId, streamingIds]);
 
 return (
     <div className="flex h-full">
