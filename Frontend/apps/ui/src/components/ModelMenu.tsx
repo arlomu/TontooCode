@@ -80,8 +80,11 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
   }, [open]);
 
   // Resolve backend provider models once per menu lifetime.
+  // Loads eagerly when the active id is not a built-in (e.g. restored from
+  // the backend), so the trigger shows the real name without opening first.
+  const needsResolve = !BUILTIN_IDS.has(value);
   useEffect(() => {
-    if (!open || extra !== null || loadingModels) return;
+    if ((!open && !needsResolve) || extra !== null || loadingModels) return;
     let dead = false;
     setLoadingModels(true);
     (async () => {
@@ -126,7 +129,7 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
       dead = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open ]);
+  }, [open, needsResolve ]);
 
   const allBuiltin = MODELS;
   const realModels = (extra ?? []).flatMap((g) => g.models);
@@ -147,7 +150,8 @@ export function ModelMenu({ value, onChange }: ModelMenuProps) {
     visibleBuiltin.find((m) => m.id === value) ??
     realModels.find((m) => m.id === value) ?? {
       id: value,
-      name: value,
+      // Unknown id (e.g. provider removed): short segment beats the full id.
+      name: value.split('/').pop() || value,
       provider: '',
     };
 
