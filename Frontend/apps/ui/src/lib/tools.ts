@@ -41,6 +41,10 @@ export function describeToolCall(name: string, input: unknown): string {
     case 'read_file':
     case 'read':
       return str(rec.path) || '…';
+    case 'glob':
+      return str(rec.pattern) || '…';
+    case 'grep':
+      return `${str(rec.pattern) ? `“${str(rec.pattern)}”` : '…'}${str(rec.path) ? ` in ${str(rec.path)}` : ''}`;
     case 'list':
       return `${str(rec.path) || 'project'}${rec.recursive ? ' · recursive' : ''}`;
     case 'grep':

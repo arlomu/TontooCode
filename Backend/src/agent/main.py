@@ -20,7 +20,7 @@ from storage import Storage
 
 from .provider import AgentError, build_model
 from .stream import _sse, error_chunk
-from .tools import TOOL_TIMEOUT, TOOLS_POOL, list_directory, read_file
+from .tools import TOOL_TIMEOUT, TOOLS_POOL, glob_files, grep_files, list_directory, read_file
 from .systemprompt import compose as compose_system_prompt
 
 
@@ -165,6 +165,46 @@ def build_agent(
         args = {"path": path, "offset": offset, "limit": limit, "encoding": encoding}
         return await _run_tool(
             "read", args, read_file, (project_dir, path, offset, limit, encoding)
+        )
+
+    @agent.tool_plain
+    async def glob(pattern: str, path: str = "", max_results: int = 100) -> str:
+        """Find files by pattern (supports *, ?, [...] and **).
+
+        `pattern` is required. `path` defaults to the project folder,
+        `max_results` caps the listing (default 100).
+        """
+        args = {"pattern": pattern, "path": path, "max_results": max_results}
+        return await _run_tool(
+            "glob", args, glob_files, (project_dir, pattern, path, max_results)
+        )
+
+    @agent.tool_plain
+    async def grep(
+        pattern: str,
+        path: str = "",
+        glob: str = ".",
+        case_insensitive: bool = False,
+        max_matches: int = 150,
+    ) -> str:
+        """Return matching lines with file paths (regex over file content).
+
+        `pattern` is required. `path` defaults to the project folder,
+        `glob` filters files ("." means all), `case_insensitive` toggles
+        case, `max_matches` caps output (default 150).
+        """
+        args = {
+            "pattern": pattern,
+            "path": path,
+            "glob": glob,
+            "case_insensitive": case_insensitive,
+            "max_matches": max_matches,
+        }
+        return await _run_tool(
+            "grep",
+            args,
+            grep_files,
+            (project_dir, pattern, path, glob, case_insensitive, max_matches),
         )
 
     return agent
