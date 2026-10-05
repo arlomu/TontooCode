@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
+import type { ChatStatus } from 'ai';
 import type { TontooMessage } from '@/types';
 import { backend } from '@/lib/backend';
 import { createTransport } from '@/lib/transport';
@@ -87,6 +88,7 @@ interface WorkspaceProps {
   draft: string;
   onDraftChange: (text: string) => void;
   onBeforeSend: (id: string, text: string) => Promise<void>;
+  onStatusChange: (id: string, status: ChatStatus) => void;
   draftProject: string;
   onDraftProjectChange: (id: string) => void;
   onAddProject: (project: NewProject) => void;
@@ -108,6 +110,7 @@ function Workspace({
   draft,
   onDraftChange,
   onBeforeSend,
+  onStatusChange,
   draftProject,
   onDraftProjectChange,
   onAddProject,
@@ -120,6 +123,11 @@ function Workspace({
     transport,
     onFinish: ({ messages: finished }) => onPersist(conversationId, finished),
   });
+
+  // Report live status upward so running chats survive switching (keep-alive).
+  useEffect(() => {
+    onStatusChange(conversationId, status);
+  }, [conversationId, status, onStatusChange]);
 
   const send = useCallback(
     (text: string) => {
@@ -184,7 +192,6 @@ function Workspace({
 export default function App() {
   const [metas, setMetas] = useState<ConversationMeta[]>([]);
   const [activeId, setActiveId] = useState<string>(() => newId());
-  const [initial, setInitial] = useState<TontooMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [level, setLevel] = useState<ThinkingLevel>(DEFAULT_LEVEL);
@@ -377,6 +384,20 @@ export default function App() {
     updateDraft(projectId, '');
   }, [updateDraft]);
 
+  // Conversations with a live stream stay mounted while hidden, so switching
+  // away and back never loses their state or status.
+  const [streamingIds, setStreamingIds] = useState<string[]>([]);
+  const streamingIdsRef = useRef(streamingIds);
+  streamingIdsRef.current = streamingIds;
+  const onStatusChange = useCallback((id: string, status: ChatStatus) => {
+    setStreamingIds((prev) => {
+      const live = status === 'streaming' || status === 'submitted';
+      if (live && !prev.includes(id)) return [...prev, id];
+      if (!live && prev.includes(id)) return prev.filter((x) => x !== id);
+      return prev;
+    });
+  }, []);
+
   // Apply design + colors live to the document. RAM only.
   useEffect(() => {
     const root = document.documentElement;
@@ -418,6 +439,8 @@ export default function App() {
   // Where the next chat lands: the project of the last opened chat.
   const lastProject = useRef(DEFAULT_PROJECT_ID);
   const newChatProject = useRef(DEFAULT_PROJECT_ID);
+  // Pending (never sent) conversation per project — New Chat returns to it.
+  const pendingRef = useRef<Record<string, string>>({});
   // Reactive copy for the new-chat project picker.
   const [draftProject, setDraftProject] = useState(DEFAULT_PROJECT_ID);
   const draftProjectRef = useRef(draftProject);
@@ -524,7 +547,12 @@ export default function App() {
           const latest = list[0]!;
           setActiveId(latest.id);
           const full = await loadConversation(latest.id);
-          if (!cancelled) setInitial(full?.messages ?? []);
+          if (!cancelled) initialsRef.current[latest.id] = full?.messages ?? [];
+        } else {
+          // No history: start with a fresh pending conversation.
+          const freshId = newId();
+          pendingRef.current[DEFAULT_PROJECT_ID] = freshId;
+          setActiveId(freshId);
         }
       } catch {
         /* fresh start on storage failure */
@@ -698,18 +726,12 @@ export default function App() {
   // Live lookup: which project a chat belongs to.
   const metasRef = useRef(metas);
   metasRef.current = metas;
+  // Initial messages per conversation for (re)mounting Workspaces.
+  const initialsRef = useRef<Record<string, TontooMessage[]>>({});
   const projectOf = useCallback(
     (id: string) =>
       metasRef.current.find((m) => m.id === id)?.projectId ?? draftProjectRef.current,
     [],
-  );
-
-  // Draft key mirrors what the composer displays: fresh (never sent) chats
-  // share one draft per project, existing chats have one per conversation.
-  const draftKeyFor = useCallback(
-    (id: string) =>
-      metasRef.current.some((m) => m.id === id) ? id : projectOf(id),
-    [projectOf],
   );
 
   const persist = useCallback(
@@ -729,11 +751,19 @@ export default function App() {
   const handleNew = useCallback(() => {
     // New chats land in the project of the last opened chat.
     // Nothing is created via the API yet — that happens on first send.
-    // Nothing auto-expands: the sidebar only moves on explicit clicks.
-    newChatProject.current = lastProject.current;
-    setDraftProject(lastProject.current);
-    setActiveId(newId());
-    setInitial([]);
+    // Return to a pending (never sent) conversation if one exists there,
+    // so its draft + empty history survive; otherwise start a fresh one.
+    const projectId = lastProject.current;
+    newChatProject.current = projectId;
+    setDraftProject(projectId);
+    const existing = pendingRef.current[projectId];
+    if (existing && !metasRef.current.some((m) => m.id === existing)) {
+      setActiveId(existing);
+      return;
+    }
+    const freshId = newId();
+    pendingRef.current[projectId] = freshId;
+    setActiveId(freshId);
   }, []);
 
   // Backend chat stubs, created lazily on first send (title = prompt head).
@@ -760,11 +790,12 @@ export default function App() {
 
   const handleBeforeSend = useCallback(
     async (id: string, text: string) => {
-      // Clear exactly the draft the composer displays (see draftKey below).
-      clearDraft(draftKeyFor(id));
+      // Clear exactly the draft the composer displays, then un-pend.
+      clearDraft(id);
+      delete pendingRef.current[projectOf(id)];
       await ensureBackendChat(id, text);
     },
-    [clearDraft, ensureBackendChat, draftKeyFor],
+    [clearDraft, ensureBackendChat, projectOf],
   );
 
   const toggleProject = useCallback((projectId: string) => {
@@ -791,14 +822,20 @@ export default function App() {
     async (id: string) => {
       if (id === activeIdRef.current) return;
       lastProject.current = projectOf(id);
-      setLoading(true);
-      try {
-        const full = await loadConversation(id);
+      // Live conversations stay mounted with their state — no reload needed.
+      if (streamingIdsRef.current.includes(id)) {
         setActiveId(id);
-        setInitial(full?.messages ?? []);
-      } finally {
-        setLoading(false);
+        return;
       }
+      if (metasRef.current.some((m) => m.id === id)) {
+        const full = await loadConversation(id);
+        initialsRef.current[id] = full?.messages ?? [];
+        setActiveId(id);
+        return;
+      }
+      // Pending fresh conversations load nothing.
+      initialsRef.current[id] ??= [];
+      setActiveId(id);
     },
     [projectOf],
   );
@@ -838,11 +875,13 @@ export default function App() {
     );
   }
 
-  // Fresh (never sent) conversations share one draft per project;
-  // existing chats have one draft per conversation.
-  const isFreshChat = !metas.some((m) => m.id === activeId);
-  const draftKey = isFreshChat ? draftProject : activeId;
-  const composerDraft = drafts[draftKey] ?? '';
+  // Mounted conversations: active + any with a live stream. Stable keys keep
+  // running chats alive across switches; hidden ones render display:none.
+  const mountedIds = useMemo(() => {
+    const ids = [activeId];
+    for (const id of streamingIds) if (id !== activeId) ids.push(id);
+    return ids;
+  }, [activeId, streamingIds]);
 
 return (
     <div className="flex h-full">
@@ -860,6 +899,11 @@ return (
           onNew={handleNew}
           onDelete={(id) => {
             clearDraft(id);
+            setStreamingIds((prev) => prev.filter((x) => x !== id));
+            delete initialsRef.current[id];
+            for (const pid of Object.keys(pendingRef.current)) {
+              if (pendingRef.current[pid] === id) delete pendingRef.current[pid];
+            }
             void deleteConversation(id).then(() => {
               setMetas((prev) => prev.filter((m) => m.id !== id));
               if (id === activeId) handleNew();
@@ -886,23 +930,32 @@ return (
         />
         <div className="flex min-h-0 flex-1">
           {view === 'chat' ? (
-            <Workspace
-              key={activeId}
-              conversationId={activeId}
-              initialMessages={initial}
-              onPersist={persist}
-              model={model}
-              onModelChange={handleModelChange}
-              level={level}
-              onLevelChange={handleLevelChange}
-              draft={composerDraft}
-              onDraftChange={(text) => updateDraft(draftKey, text)}
-              onBeforeSend={handleBeforeSend}
-              draftProject={draftProject}
-              onDraftProjectChange={setDraftProject}
-              onAddProject={addProject}
-              projects={projectsWithFolders}
-            />
+            mountedIds.map((id) => (
+              <div
+                key={id}
+                className="min-w-0 flex-1"
+                style={id === activeId ? { display: 'contents' } : { display: 'none' }}
+                aria-hidden={id === activeId ? undefined : true}
+              >
+                <Workspace
+                  conversationId={id}
+                  initialMessages={initialsRef.current[id] ?? []}
+                  onPersist={persist}
+                  model={model}
+                  onModelChange={handleModelChange}
+                  level={level}
+                  onLevelChange={handleLevelChange}
+                  draft={drafts[id] ?? ''}
+                  onDraftChange={(text) => updateDraft(id, text)}
+                  onBeforeSend={handleBeforeSend}
+                  onStatusChange={onStatusChange}
+                  draftProject={draftProject}
+                  onDraftProjectChange={setDraftProject}
+                  onAddProject={addProject}
+                  projects={projectsWithFolders}
+                />
+              </div>
+            ))
           ) : (
             <div className="min-w-0 flex-1">
               <SettingsContent
