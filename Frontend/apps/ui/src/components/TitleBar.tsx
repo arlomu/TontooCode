@@ -34,24 +34,28 @@ export function TitleBar({ recent, activeId, onSelect }: TitleBarProps) {
       {/* recent chats — stretched across the whole strip, equal shares */}
       {recent.length > 0 && (
         <nav aria-label="Recent chats" className="tt-nodrag flex min-w-0 flex-1 items-stretch gap-1">
-          {recent.slice(0, RECENT_TAB_COUNT).map((c) => {
+          {recent.slice(0, RECENT_TAB_COUNT).map((c, i) => {
             const active = c.id === activeId;
             return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onSelect(c.id)}
-                title={c.title}
-                aria-current={active ? 'true' : undefined}
-                className={cn(
-                  'my-[5px] min-w-0 flex-1 truncate rounded-md px-3 text-center text-[12px] transition-colors',
-                  active
-                    ? 'bg-tt-card font-medium text-tt-ink shadow-[0_1px_2px_rgb(15_23_42/0.08)]'
-                    : 'text-tt-ink-2 hover:bg-tt-card/60 hover:text-tt-ink',
+              <div key={c.id} className="flex min-w-0 flex-1 items-stretch">
+                {i > 0 && (
+                  <span aria-hidden className="mx-0.5 my-auto h-4 w-px shrink-0 bg-tt-hairline" />
                 )}
-              >
-                {c.title}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onSelect(c.id)}
+                  title={c.title}
+                  aria-current={active ? 'true' : undefined}
+                  className={cn(
+                    'my-[5px] min-w-0 flex-1 truncate rounded-md px-3 text-center text-[12px] transition-colors',
+                    active
+                      ? 'bg-tt-card font-medium text-tt-ink shadow-[0_1px_2px_rgb(15_23_42/0.08)]'
+                      : 'text-tt-ink-2 hover:bg-tt-card/60 hover:text-tt-ink',
+                  )}
+                >
+                  {c.title}
+                </button>
+              </div>
             );
           })}
         </nav>
