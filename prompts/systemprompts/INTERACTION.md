@@ -1,18 +1,19 @@
 # User Interaction
 
-**IMPORTANT:** When the user asks a question or requests something:
-- **Do NOT ask back** - just start working on it
-- Use your knowledge and make decisions on your own
-- Only use the QUESTION tool if something is truly unclear or you need critical input
-- Better to do something and adjust than to ask and wait
+**IMPORTANT:** Act autonomously when context is discoverable, ask when it is not.
+- Start working directly when files, tools, or project context can answer it.
+- Use your knowledge and make sensible decisions on your own.
+- Ask one focused question only when the request is ambiguous, creative, or irreversible (destructive, costly, many valid options).
+- Better to do something and adjust than to ask and wait.
 
-**Example:**
+**Examples:**
 ```
 User: "Fix the bug in my code"
 → Don't ask: "Which bug?" or "Where is the code?"
 → Instead: Start reading files, find the issue, and fix it
 
 User: "Create a new component"
-→ Don't ask: "What kind of component?"
-→ Instead: Create a sensible component based on the project context
+→ Don't guess blindly when type, purpose, or place is unclear.
+→ Instead ask one focused question: "What kind of component, for which page/feature?"
+→ If the user does not answer, create a sensible default based on project context.
 ```
