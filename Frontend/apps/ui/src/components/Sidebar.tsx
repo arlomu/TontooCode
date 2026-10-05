@@ -17,6 +17,8 @@ interface SidebarProps {
   activeId: string;
   /** Conversations with a live agent stream. */
   liveIds: string[];
+  /** Conversations whose agent finished while in the background (unread). */
+  doneIds: string[];
   expandedIds: Set<string>;
   onToggleProject: (id: string) => void;
   limits: Record<string, number>;
@@ -35,6 +37,7 @@ export function Sidebar({
   chatsByProject,
   activeId,
   liveIds,
+  doneIds,
   expandedIds,
   onToggleProject,
   limits,
@@ -96,9 +99,12 @@ export function Sidebar({
           const limit = limits[p.id] ?? PAGE_SIZE;
           const visible = chats.slice(0, limit);
           const remaining = chats.length - visible.length;
-          // Bubble on the project row only while collapsed; expanded rows
-          // show it on the exact running chat(s) below.
+          // Bubbles on the project row only while collapsed; expanded rows
+          // show them on the exact chat(s) below. Live and done show together.
           const projectLive = !open && chats.some((c) => liveIds.includes(c.id));
+          const projectDone =
+            !open &&
+            chats.some((c) => !liveIds.includes(c.id) && doneIds.includes(c.id));
 
           return (
             <div key={p.id}>
@@ -121,7 +127,8 @@ export function Sidebar({
                 />
                 <Folder size={15} className="shrink-0 text-tt-ink-2" strokeWidth={1.8} />
                 <span className="truncate text-[13.5px] text-tt-ink">{p.name}</span>
-                {projectLive && <LiveBubble label={`Agent running in ${p.name}`} />}
+                {projectLive && <LiveBubble tone="live" label={`Agent running in ${p.name}`} />}
+                {projectDone && <LiveBubble tone="done" label={`Agent finished in ${p.name}`} />}
               </button>
 
               {/* expand / collapse with a height animation */}
@@ -155,8 +162,12 @@ export function Sidebar({
                             >
                               <span className="flex items-center gap-2">
                                 <span className="min-w-0 flex-1 truncate text-[13px]">{c.title}</span>
-                                {liveIds.includes(c.id) && (
-                                  <LiveBubble label={`Agent running in ${c.title}`} />
+                                {liveIds.includes(c.id) ? (
+                                  <LiveBubble tone="live" label={`Agent running in ${c.title}`} />
+                                ) : (
+                                  doneIds.includes(c.id) && (
+                                    <LiveBubble tone="done" label={`Agent finished in ${c.title}`} />
+                                  )
                                 )}
                               </span>
                             </button>

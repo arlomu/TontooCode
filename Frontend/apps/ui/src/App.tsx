@@ -398,6 +398,9 @@ export default function App() {
     });
   }, []);
 
+  // Agents that finished while in the background stay yellow until opened.
+  const [finishedIds, setFinishedIds] = useState<string[]>([]);
+
   // Apply design + colors live to the document. RAM only.
   useEffect(() => {
     const root = document.documentElement;
@@ -747,6 +750,10 @@ export default function App() {
   const persist = useCallback(
     (id: string, messages: TontooMessage[]) => {
       const conv = summarize(id, messages, projectOf(id));
+      // Finished in the background → yellow until opened.
+      if (id !== activeIdRef.current) {
+        setFinishedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      }
       void saveConversation(conv).then(() => {
         setMetas((prev) => {
           const { messages: _drop, ...meta } = conv;
@@ -847,6 +854,8 @@ export default function App() {
     async (id: string) => {
       if (id === activeIdRef.current) return;
       lastProject.current = projectOf(id);
+      // Opening marks a finished agent as read.
+      setFinishedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev));
       // Live conversations stay mounted with their state — no reload needed.
       if (streamingIdsRef.current.includes(id)) {
         setActiveId(id);
@@ -918,6 +927,7 @@ return (
           chatsByProject={chatsByProject}
           activeId={activeId}
           liveIds={streamingIds}
+          doneIds={finishedIds}
           expandedIds={expanded}
           onToggleProject={toggleProject}
           limits={limits}
@@ -927,6 +937,7 @@ return (
           onDelete={(id) => {
             clearDraft(id);
             setStreamingIds((prev) => prev.filter((x) => x !== id));
+            setFinishedIds((prev) => prev.filter((x) => x !== id));
             delete initialsRef.current[id];
             for (const pid of Object.keys(pendingRef.current)) {
               if (pendingRef.current[pid] === id) delete pendingRef.current[pid];
@@ -954,6 +965,7 @@ return (
           recent={metas}
           activeId={activeId}
           liveIds={streamingIds}
+          doneIds={finishedIds}
           onSelect={(id) => void handleSelect(id)}
         />
         <div className="flex min-h-0 flex-1">

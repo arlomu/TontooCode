@@ -1,5 +1,17 @@
-/** Round live indicator for a running agent. Signal color with a soft ping. */
-export function LiveBubble({ label }: { label?: string }) {
+/** Round agent indicator. Live pulses blue, done sits yellow and static. */
+export function LiveBubble({ label, tone }: { label?: string; tone: 'live' | 'done' }) {
+  if (tone === 'done') {
+    return (
+      <span
+        role="status"
+        aria-label={label ?? 'Agent finished'}
+        title={label ?? 'Agent finished'}
+        className="relative flex size-[7px] shrink-0"
+      >
+        <span className="relative inline-flex size-[7px] rounded-full bg-yellow-400" />
+      </span>
+    );
+  }
   return (
     <span
       role="status"

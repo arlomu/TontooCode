@@ -16,6 +16,8 @@ interface TitleBarProps {
   activeId: string;
   /** Conversations with a live agent stream. */
   liveIds: string[];
+  /** Conversations whose agent finished while in the background (unread). */
+  doneIds: string[];
   onSelect: (id: string) => void;
 }
 
@@ -25,7 +27,7 @@ interface TitleBarProps {
  * A drag region that carries the newest chats as tabs on the right, just
  * left of the native caption buttons Electron overlays via titleBarOverlay.
  */
-export function TitleBar({ recent, activeId, liveIds, onSelect }: TitleBarProps) {
+export function TitleBar({ recent, activeId, liveIds, doneIds, onSelect }: TitleBarProps) {
   const platform = window.tontoo?.platform;
   const caption = platform === 'darwin' ? CAPTION_W.darwin : CAPTION_W.win32;
 
@@ -40,6 +42,7 @@ export function TitleBar({ recent, activeId, liveIds, onSelect }: TitleBarProps)
           {recent.slice(0, RECENT_TAB_COUNT).map((c, i) => {
             const active = c.id === activeId;
             const live = liveIds.includes(c.id);
+            const done = !live && doneIds.includes(c.id);
             return (
               <div key={c.id} className="flex min-w-0 flex-1 items-stretch">
                 {i > 0 && (
@@ -58,7 +61,11 @@ export function TitleBar({ recent, activeId, liveIds, onSelect }: TitleBarProps)
                   )}
                 >
                   <span className="flex min-w-0 items-center justify-center gap-1.5">
-                    {live && <LiveBubble label={`Agent running in ${c.title}`} />}
+                    {live ? (
+                      <LiveBubble tone="live" label={`Agent running in ${c.title}`} />
+                    ) : (
+                      done && <LiveBubble tone="done" label={`Agent finished in ${c.title}`} />
+                    )}
                     <span className="min-w-0 truncate">{c.title}</span>
                   </span>
                 </button>
