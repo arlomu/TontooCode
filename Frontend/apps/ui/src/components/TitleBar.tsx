@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import type { ConversationMeta } from '@/lib/store';
+import { LiveBubble } from '@/components/LiveBubble';
 
 /** Mirrors TITLEBAR_HEIGHT in apps/desktop/src/main.js */
 export const TITLEBAR_HEIGHT = 38;
@@ -13,6 +14,8 @@ export const RECENT_TAB_COUNT = 5;
 interface TitleBarProps {
   recent: ConversationMeta[];
   activeId: string;
+  /** Conversations with a live agent stream. */
+  liveIds: string[];
   onSelect: (id: string) => void;
 }
 
@@ -22,7 +25,7 @@ interface TitleBarProps {
  * A drag region that carries the newest chats as tabs on the right, just
  * left of the native caption buttons Electron overlays via titleBarOverlay.
  */
-export function TitleBar({ recent, activeId, onSelect }: TitleBarProps) {
+export function TitleBar({ recent, activeId, liveIds, onSelect }: TitleBarProps) {
   const platform = window.tontoo?.platform;
   const caption = platform === 'darwin' ? CAPTION_W.darwin : CAPTION_W.win32;
 
@@ -36,6 +39,7 @@ export function TitleBar({ recent, activeId, onSelect }: TitleBarProps) {
         <nav aria-label="Recent chats" className="tt-nodrag flex min-w-0 flex-1 items-stretch gap-1">
           {recent.slice(0, RECENT_TAB_COUNT).map((c, i) => {
             const active = c.id === activeId;
+            const live = liveIds.includes(c.id);
             return (
               <div key={c.id} className="flex min-w-0 flex-1 items-stretch">
                 {i > 0 && (
@@ -53,7 +57,10 @@ export function TitleBar({ recent, activeId, onSelect }: TitleBarProps) {
                       : 'text-tt-ink-2 hover:bg-tt-card/60 hover:text-tt-ink',
                   )}
                 >
-                  {c.title}
+                  <span className="flex min-w-0 items-center justify-center gap-1.5">
+                    {live && <LiveBubble label={`Agent running in ${c.title}`} />}
+                    <span className="min-w-0 truncate">{c.title}</span>
+                  </span>
                 </button>
               </div>
             );

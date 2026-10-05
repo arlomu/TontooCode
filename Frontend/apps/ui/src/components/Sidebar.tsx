@@ -6,6 +6,7 @@ import { ProjectContextMenu } from '@/components/ProjectContextMenu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RenameProjectDialog } from '@/components/RenameProjectDialog';
 import { EditSubfoldersDialog } from '@/components/EditSubfoldersDialog';
+import { LiveBubble } from '@/components/LiveBubble';
 
 export const PAGE_SIZE = 10;
 export const PAGE_STEP = 15;
@@ -14,6 +15,8 @@ interface SidebarProps {
   projects: { id: string; name: string; subfolders?: string[] }[];
   chatsByProject: Record<string, ConversationMeta[]>;
   activeId: string;
+  /** Conversations with a live agent stream. */
+  liveIds: string[];
   expandedIds: Set<string>;
   onToggleProject: (id: string) => void;
   limits: Record<string, number>;
@@ -31,6 +34,7 @@ export function Sidebar({
   projects,
   chatsByProject,
   activeId,
+  liveIds,
   expandedIds,
   onToggleProject,
   limits,
@@ -92,6 +96,9 @@ export function Sidebar({
           const limit = limits[p.id] ?? PAGE_SIZE;
           const visible = chats.slice(0, limit);
           const remaining = chats.length - visible.length;
+          // Bubble on the project row only while collapsed; expanded rows
+          // show it on the exact running chat(s) below.
+          const projectLive = !open && chats.some((c) => liveIds.includes(c.id));
 
           return (
             <div key={p.id}>
@@ -114,6 +121,7 @@ export function Sidebar({
                 />
                 <Folder size={15} className="shrink-0 text-tt-ink-2" strokeWidth={1.8} />
                 <span className="truncate text-[13.5px] text-tt-ink">{p.name}</span>
+                {projectLive && <LiveBubble label={`Agent running in ${p.name}`} />}
               </button>
 
               {/* expand / collapse with a height animation */}
@@ -145,7 +153,12 @@ export function Sidebar({
                                   : 'text-tt-ink-2 hover:bg-tt-card/60',
                               )}
                             >
-                              <span className="block truncate text-[13px]">{c.title}</span>
+                              <span className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate text-[13px]">{c.title}</span>
+                                {liveIds.includes(c.id) && (
+                                  <LiveBubble label={`Agent running in ${c.title}`} />
+                                )}
+                              </span>
                             </button>
                             <button
                               type="button"

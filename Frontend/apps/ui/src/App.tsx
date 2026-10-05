@@ -907,6 +907,7 @@ return (
           projects={sortedProjects}
           chatsByProject={chatsByProject}
           activeId={activeId}
+          liveIds={streamingIds}
           expandedIds={expanded}
           onToggleProject={toggleProject}
           limits={limits}
@@ -942,6 +943,7 @@ return (
         <TitleBar
           recent={metas}
           activeId={activeId}
+          liveIds={streamingIds}
           onSelect={(id) => void handleSelect(id)}
         />
         <div className="flex min-h-0 flex-1">
