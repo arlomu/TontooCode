@@ -20,7 +20,7 @@ from storage import Storage
 
 from .provider import AgentError, build_model
 from .stream import _sse, error_chunk
-from .tools import TOOL_TIMEOUT, TOOLS_POOL, list_directory
+from .tools import TOOL_TIMEOUT, TOOLS_POOL, list_directory, read_file
 from .systemprompt import compose as compose_system_prompt
 
 
@@ -106,8 +106,24 @@ def build_agent(
     status_queue: asyncio.Queue,
     instructions: str | None = None,
 ) -> Agent:
-    """Create the agent with its tools (list first, more plug in here)."""
+    """Create the agent with its tools (more plug in here)."""
     agent = Agent(model_instance, instructions=instructions) if instructions else Agent(model_instance)
+
+    async def _run_tool(name: str, args: dict[str, Any], impl, impl_args: tuple) -> str:
+        """Run one tool call in the pool, streaming input/output status."""
+        call_id = f"call-{uuid4().hex[:8]}"
+        status_queue.put_nowait(("input", call_id, name, args))
+        loop = asyncio.get_running_loop()
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(TOOLS_POOL, impl, *impl_args),
+                timeout=TOOL_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            result = f"Error: {name} timed out after {TOOL_TIMEOUT}s"
+        error = result.startswith("Error:")
+        status_queue.put_nowait(("output", call_id, result, error))
+        return result
 
     @agent.tool_plain
     async def list(  # noqa: A003 — the tool is literally named `list` (TOOLS.md)
@@ -123,7 +139,6 @@ def build_agent(
         `max_depth` to limit levels (0 = unlimited), `include_hidden` for
         dotfiles, `hide_folders` to list files only.
         """
-        call_id = f"call-{uuid4().hex[:8]}"
         args = {
             "path": path,
             "recursive": recursive,
@@ -131,27 +146,26 @@ def build_agent(
             "max_depth": max_depth,
             "hide_folders": hide_folders,
         }
-        status_queue.put_nowait(("input", call_id, "list", args))
-        loop = asyncio.get_running_loop()
-        try:
-            result = await asyncio.wait_for(
-                loop.run_in_executor(
-                    TOOLS_POOL,
-                    list_directory,
-                    project_dir,
-                    path,
-                    recursive,
-                    include_hidden,
-                    max_depth,
-                    hide_folders,
-                ),
-                timeout=TOOL_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            result = f"Error: list timed out after {TOOL_TIMEOUT}s"
-        error = result.startswith("Error:")
-        status_queue.put_nowait(("output", call_id, result, error))
-        return result
+        return await _run_tool(
+            "list",
+            args,
+            list_directory,
+            (project_dir, path, recursive, include_hidden, max_depth, hide_folders),
+        )
+
+    @agent.tool_plain
+    async def read(
+        path: str, offset: int = 0, limit: int = 100, encoding: str = "utf8"
+    ) -> str:
+        """Return file content, sliced by line range.
+
+        `path` is required. `offset` starts at line 0, `limit` caps the
+        lines (default 100), `encoding` defaults to utf8.
+        """
+        args = {"path": path, "offset": offset, "limit": limit, "encoding": encoding}
+        return await _run_tool(
+            "read", args, read_file, (project_dir, path, offset, limit, encoding)
+        )
 
     return agent
 

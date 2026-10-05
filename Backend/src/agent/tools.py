@@ -10,6 +10,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+import codecs
 
 # Two workers: enough for parallel tool calls, bounded so runaway tools
 # cannot exhaust the machine. Extra calls queue instead of blocking.
@@ -178,7 +179,74 @@ def _file_size(path: Path) -> int:
         return 0
 
 
+def read_file(
+    project_dir: str,
+    path: str,
+    offset: int = 0,
+    limit: int = 100,
+    encoding: str = "utf8",
+) -> str:
+    """Return file content, sliced by line range.
+
+    Mirrors TOOLS.md `read`: path is required, offset defaults to 0,
+    limit to 100 lines, encoding to utf8.
+    """
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset = 0
+    try:
+        limit = max(1, min(int(limit), 2000))
+    except (TypeError, ValueError):
+        limit = 100
+
+    try:
+        codec = codecs.lookup(encoding or "utf8").name
+    except LookupError:
+        return f"Error: unknown encoding '{encoding}'"
+
+    target = Path(path) if path else None
+    if target is None:
+        return "Error: no path given"
+    if not target.is_absolute():
+        if not project_dir:
+            return "Error: relative path without project context — pass an absolute path"
+        target = Path(project_dir) / path
+    try:
+        resolved = target.resolve()
+    except OSError as exc:
+        return f"Error: cannot resolve '{target}': {exc}"
+    if project_dir:
+        try:
+            root = Path(project_dir).resolve()
+        except OSError as exc:
+            return f"Error: cannot resolve project folder: {exc}"
+        if resolved != root and root not in resolved.parents:
+            return f"Error: '{resolved}' is outside the project ({root})"
+    if not resolved.exists():
+        return f"Error: not found: {resolved}"
+    if resolved.is_dir():
+        return f"Error: '{resolved}' is a directory — use list"
+    try:
+        text = resolved.read_text(encoding=codec)
+    except UnicodeDecodeError:
+        return f"Error: cannot decode '{resolved}' as {codec} (binary file?)"
+    except OSError as exc:
+        return f"Error: cannot read '{resolved}': {exc}"
+    lines = text.splitlines()
+    total = len(lines)
+    if total == 0:
+        return f"{resolved} — empty file (0 lines)"
+    window = lines[offset : offset + limit]
+    if not window:
+        return f"{resolved} — lines {offset + 1}–{offset + limit} of {total} (no lines in this range)"
+    numbered = [f"{offset + i + 1}: {line}" for i, line in enumerate(window)]
+    head = f"{resolved} — lines {offset + 1}–{offset + len(window)} of {total}"
+    return head + "\n" + "\n".join(numbered)
+
+
 #: Registry for dispatch (more tools plug in here).
 TOOL_IMPLS: dict[str, Any] = {
     "list": list_directory,
+    "read": read_file,
 }
